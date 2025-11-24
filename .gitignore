@@ -13,3 +13,6 @@ data/processed/*
 # System files
 .DS_Store
 Thumbs.db
+
+# Models folder
+models/*.pth
