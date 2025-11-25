@@ -16,3 +16,7 @@ Thumbs.db
 
 # Models folder
 models/*.pth
+
+# OSMnx cache folder
+osmnx_cache/
+cache/

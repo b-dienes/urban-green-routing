@@ -9,7 +9,18 @@ output_folder = os.getcwd()
 print("CURRENT USER FOLDER: ", user)
 print("OUTPUT FOLDER: ", output_folder)
 
-def bounding_box():
+
+def user_input():
+    # USER INPUT:
+    # SW and NE coordinates (lon, lat)
+    # Resolution (min: 0.6 meter/pixel is the highest possible in NAIP)
+    sw_lat, sw_lon = 44.009502297007145, -121.34656587303277
+    ne_lat, ne_lon = 44.06010437225738, -121.26681950157074
+    resolution = 2.25
+
+    return sw_lat, sw_lon, ne_lat, ne_lon, resolution
+
+def bounding_box(sw_lat, sw_lon, ne_lat, ne_lon):
     # This function transforms a two WGS84 (lat-long) coordinate pairs to Web Mercator
     # No input parameters required
     # 2 user-defined Web Mercator coodinate pairs and resolution returned
@@ -17,18 +28,11 @@ def bounding_box():
     # Transform from WGS84 to Web Mercator
     transformer = Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)
 
-    # USER INPUT:
-    # SW and NE coordinates (lon, lat)
-    # Resolution (min: 0.6 is the highest possible in NAIP)
-    sw_lat, sw_lon = 44.043, -121.326
-    ne_lat, ne_lon = 44.054, -121.312
-    resolution = 0.6
-
     # Transformation done here
     xmin, ymin = transformer.transform(sw_lon, sw_lat)
     xmax, ymax = transformer.transform(ne_lon, ne_lat)
 
-    return xmin, ymin, xmax, ymax, resolution
+    return xmin, ymin, xmax, ymax
 
 
 def tile_calculator(xmin, ymin, xmax, ymax, resolution):
@@ -66,6 +70,10 @@ def naip_downloader(xmin, ymin, xmax, ymax, width, height):
 
     print('NAIP DOWNLOADER FINISHED')
 
-xmin, ymin, xmax, ymax, resolution = bounding_box()
-width, height = tile_calculator(xmin, ymin, xmax, ymax, resolution)
-naip_downloader(xmin, ymin, xmax, ymax, width, height)
+
+sw_lat, sw_lon, ne_lat, ne_lon, resolution = user_input()
+
+if __name__ == "__main__":
+    xmin, ymin, xmax, ymax = bounding_box(sw_lat, sw_lon, ne_lat, ne_lon)
+    width, height = tile_calculator(xmin, ymin, xmax, ymax, resolution)
+    naip_downloader(xmin, ymin, xmax, ymax, width, height)
