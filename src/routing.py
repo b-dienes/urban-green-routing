@@ -15,7 +15,8 @@ ymin, xmin, ymax, xmax, resolution = user_input()
 def osm_graph_downloader(xmin, ymin, xmax, ymax):
 
     # Bbox as tuple
-    bbox = (ymax, ymin, xmax, xmin)
+    #Bbox: left, bottom, right, top
+    bbox = (xmin, ymin, xmax, ymax)
     print("bbox: ", bbox)
 
     G = ox.graph_from_bbox(bbox, network_type="walk", simplify=False)
