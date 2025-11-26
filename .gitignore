@@ -20,3 +20,7 @@ models/*.pth
 # OSMnx cache folder
 osmnx_cache/
 cache/
+
+# AUX files
+*.aux
+*.aux.xml
