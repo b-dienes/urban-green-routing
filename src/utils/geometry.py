@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from pyproj import Transformer
 from utils.inputs import user_input, UserInput
 
-
 @dataclass
 class BoundingBoxMercator:
     xmin: object
@@ -45,3 +44,15 @@ def tile_calculator(bbox_mercator: BoundingBoxMercator, resolution):
     print('Height: ', height)
  
     return width, height
+
+def bounding_box_osm(user_input: UserInput):
+
+    xmin = user_input.sw_lon
+    ymin = user_input.sw_lat
+    xmax = user_input.ne_lon
+    ymax = user_input.ne_lat
+
+    # OSM requires WGS84 bbox as tuple: left, bottom, right, top
+    bbox_osm = (xmin, ymin, xmax, ymax)
+    print("bbox: ", bbox_osm)
+    return bbox_osm

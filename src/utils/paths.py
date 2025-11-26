@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 def get_data_folder(subfolder="raw"):
     """
     Returns the absolute path to a project data subfolder, creating it if necessary.
