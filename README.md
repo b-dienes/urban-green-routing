@@ -20,4 +20,10 @@ Urban Green Routing is a small open-source project to compute tree-optimized wal
 
 ## Status
 
-Early-stage: project skeleton and pipeline planned.
+NAIP Downloader: Fully modular, parameterized, and testable; can run standalone via __main__.
+
+OSM Downloader: Core functionality implemented; structure will be refactored for modularity.
+
+Data Handling & Utilities: User inputs, AOI conversion, bounding boxes, and tile calculations are implemented; folder management centralized.
+
+Code Structure: Clear separation of responsibilities across modules; scripts are concise (~50 lines each) and maintainable.
