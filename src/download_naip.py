@@ -18,7 +18,7 @@ def naip_request(bbox_mercator: BoundingBoxMercator, width, height):
     "imageSR": 102100,
     "size": str(width) + ',' + str(height),
     "adjustAspectRatio": True,
-    "format": "jpgpng",
+    "format": "tiff",
     "f": "image",
     "dpi":96}
 
@@ -26,7 +26,7 @@ def naip_request(bbox_mercator: BoundingBoxMercator, width, height):
     return response.content
 
 def naip_save(response_content, output_folder):
-    with open('{0}/naip_test.jpg'.format(output_folder), 'wb') as f:
+    with open('{0}/naip_test.tif'.format(output_folder), 'wb') as f:
             f.write(response_content)
     print('NAIP DOWNLOADER FINISHED')
 
