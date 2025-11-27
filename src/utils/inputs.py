@@ -12,9 +12,9 @@ def user_input():
     # USER INPUT:
     # SW and NE coordinates (lon, lat)
     # Resolution (min: 0.6 meter/pixel is the highest possible in NAIP)
-    sw_lat, sw_lon = 44.009502297007145, -121.34656587303277
-    ne_lat, ne_lon = 44.06010437225738, -121.26681950157074
-    resolution = 3
+    sw_lat, sw_lon = 44.04, -121.33
+    ne_lat, ne_lon = 44.06, -121.30
+    resolution = 1.25
 
     return UserInput(
         sw_lat = sw_lat,
