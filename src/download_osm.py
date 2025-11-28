@@ -21,7 +21,7 @@ def osm_visualize(response_content):
 def osm_gpkg_save(response_content,output_folder):
     # Convert graph to GeoDataFrames and save as standard GIS layers
     nodes, edges = ox.graph_to_gdfs(response_content)
-    nodes.to_file("{0}/nodes.gpkg".format(output_folder), driver="GPKG")  # GeoPackage
+    nodes.to_file("{0}/nodes.gpkg".format(output_folder), driver="GPKG")
     edges.to_file("{0}/edges.gpkg".format(output_folder), driver="GPKG")
 
 def osm_graph_downloader(bbox_osm):
