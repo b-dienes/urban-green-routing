@@ -1,6 +1,10 @@
 from dataclasses import dataclass
 from pyproj import Transformer
 from utils.inputs import user_input, UserInput
+import geopandas as gpd
+import rasterio
+from rasterio.warp import calculate_default_transform, reproject, Resampling
+
 
 @dataclass
 class BoundingBoxMercator:
@@ -56,3 +60,37 @@ def bounding_box_osm(user_input: UserInput):
     bbox_osm = (xmin, ymin, xmax, ymax)
     print("bbox: ", bbox_osm)
     return bbox_osm
+
+def reproject_raster_layer(dst_crs, input_raster, output_raster):
+    # dst_crs: string
+    # input raster: path to file, string
+    # output raster: path to file, string
+    with rasterio.open(input_raster) as src:
+        transform, width, height = calculate_default_transform(
+            src.crs, dst_crs, src.width, src.height, *src.bounds)
+        kwargs = src.meta.copy()
+        kwargs.update({
+            'crs': dst_crs,
+            'transform': transform,
+            'width': width,
+            'height': height
+        })
+
+        with rasterio.open(output_raster, "w", **kwargs) as dst:
+            for i in range(1, src.count + 1):
+                reproject(
+                    source=rasterio.band(src, i),
+                    destination=rasterio.band(dst, i),
+                    src_transform=src.transform,
+                    src_crs=src.crs,
+                    dst_transform=transform,
+                    dst_crs=dst_crs,
+                    resampling=Resampling.nearest)
+
+
+def reproject_vector_layer(dst_crs, input_vector, output_vector):
+
+    gdf = gpd.read_file(input_vector)
+    gdf = gdf.to_crs(dst_crs)
+    gdf.to_file("{0}".format(output_vector), driver="GPKG")
+   
