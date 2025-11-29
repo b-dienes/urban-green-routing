@@ -4,6 +4,7 @@ from utils.paths import get_data_folder
 from utils.inputs import user_input, UserInput
 from utils.geometry import bounding_box_mercator, tile_calculator, BoundingBoxMercator
 
+
 def naip_request(bbox_mercator: BoundingBoxMercator, width, height):
     print('NAIP DOWNLOADER RUNNING')
     xmin = bbox_mercator.xmin
