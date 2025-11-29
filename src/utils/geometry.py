@@ -85,7 +85,6 @@ def reproject_raster_layer(dst_crs, input_raster, output_raster):
                     dst_crs=dst_crs,
                     resampling=Resampling.nearest)
 
-
 def reproject_vector_layer(dst_crs, input_vector, output_vector):
     gdf = gpd.read_file(input_vector)
     gdf = gdf.to_crs(dst_crs)
@@ -101,3 +100,18 @@ def raster_to_vector(input_raster, output_vector):
     
         gdf = gpd.GeoDataFrame(features, crs=src.crs)
         gdf.to_file(output_vector, driver="GPKG")
+
+def dissolve_vector(input_vector):
+    gdf = gpd.read_file(input_vector)
+    dissolved = gdf.dissolve(by=None, method='coverage')
+    return dissolved
+
+def simplify_vector(dissolved):
+    gdf= dissolved
+    simplified = gdf.GeoSeries.simplify(2.5, preserve_topology=True)
+    return simplified
+
+def buffer_vector(simplified):
+    gdf = simplified
+    buffered = gdf.GeoSeries.buffer(5.0)
+    return buffered
