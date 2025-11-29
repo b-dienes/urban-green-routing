@@ -18,4 +18,5 @@ def get_data_folder(subfolder="raw"):
     folder = project_root / subfolder
     folder.mkdir(parents=True, exist_ok=True)
     print("FOLDER: ", folder)
-    return str(folder)
+    #return str(folder)
+    return folder
