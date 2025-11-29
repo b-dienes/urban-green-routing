@@ -25,21 +25,25 @@ def naip_request(bbox_mercator: BoundingBoxMercator, width, height):
     response = requests.get(url, params=params)
     return response.content
 
-def naip_save(response_content, output_folder):
-    with open('{0}/naip_test.tif'.format(output_folder), 'wb') as f:
-            f.write(response_content)
-    print('NAIP DOWNLOADER FINISHED')
+def naip_save(user_input: UserInput, response_content, output_folder):
+    aoi_name = user_input.aoi_name
+    output_path = output_folder / f"{aoi_name}.tif"
 
-def naip_downloader(bbox_mercator: BoundingBoxMercator, width, height):
+    with open(output_path, 'wb') as f:
+            f.write(response_content)
+
+    print('NAIP DOWNLOADER FINISHED: ', output_path)
+
+def naip_downloader(user_input: UserInput, bbox_mercator: BoundingBoxMercator, width, height):
 
     response_content = naip_request(bbox_mercator, width, height)
 
     output_folder = get_data_folder("raw")
 
-    naip_save(response_content, output_folder)
+    naip_save(user_input, response_content, output_folder)
 
 if __name__ == "__main__":
     user_input = user_input()
     bbox_mercator = bounding_box_mercator(user_input)
     width, height = tile_calculator(bbox_mercator, user_input.resolution)
-    naip_downloader(bbox_mercator, width, height)
+    naip_downloader(user_input, bbox_mercator, width, height)
