@@ -1,4 +1,8 @@
+from utils.paths import get_data_folder
 from utils.geometry import reproject_raster_layer, reproject_vector_layer
+
+
+
 
 # Reproject all layers to EPSG: 5070 for testing. Later it can change dynamically.
 
@@ -6,8 +10,9 @@ from utils.geometry import reproject_raster_layer, reproject_vector_layer
 def reproject_naip_image():
 
     dst_crs = 'EPSG:5070'
-    input_raster = 'C:/Users/balazs/urban-green-routing/data/raw/naip_test.tif'
-    output_raster = 'C:/Users/balazs/urban-green-routing/data/raw/naip_test_reprojected.tif'
+    input_raster = get_data_folder("raw") + '/naip_test.tif'
+    output_raster = get_data_folder("raw") + '/naip_test_reprojected.tif'
+    print('INPUT RASTER PATH: ', input_raster)
 
     reproject_raster_layer(dst_crs, input_raster, output_raster)
 
