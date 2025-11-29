@@ -4,6 +4,7 @@ from utils.inputs import user_input, UserInput
 import geopandas as gpd
 import rasterio
 from rasterio.features import shapes
+from shapely.geometry import shape
 from rasterio.warp import calculate_default_transform, reproject, Resampling
 
 
@@ -63,9 +64,6 @@ def bounding_box_osm(user_input: UserInput):
     return bbox_osm
 
 def reproject_raster_layer(dst_crs, input_raster, output_raster):
-    # dst_crs: string
-    # input raster: path to file, string
-    # output raster: path to file, string
     with rasterio.open(input_raster) as src:
         transform, width, height = calculate_default_transform(
             src.crs, dst_crs, src.width, src.height, *src.bounds)
@@ -74,8 +72,7 @@ def reproject_raster_layer(dst_crs, input_raster, output_raster):
             'crs': dst_crs,
             'transform': transform,
             'width': width,
-            'height': height
-        })
+            'height': height})
 
         with rasterio.open(output_raster, "w", **kwargs) as dst:
             for i in range(1, src.count + 1):
@@ -90,19 +87,17 @@ def reproject_raster_layer(dst_crs, input_raster, output_raster):
 
 
 def reproject_vector_layer(dst_crs, input_vector, output_vector):
-
     gdf = gpd.read_file(input_vector)
     gdf = gdf.to_crs(dst_crs)
-    gdf.to_file("{0}".format(output_vector), driver="GPKG")
+    gdf.to_file(output_vector, driver="GPKG")
 
-def raster_to_vector(input_raster):
-    mask = None
-    with rasterio.Env():
-        with rasterio.open(input_raster) as src:
-            image = src.read(1) # first band
-            results = (
-            {'properties': {'raster_val': v}, 'geometry': s}
-            for i, (s, v) 
-            in enumerate(
-                shapes(image, mask=mask, transform=src.transform)))
-    return results
+def raster_to_vector(input_raster, output_vector):
+    with rasterio.open(input_raster) as src:
+        features = []
+        for geom, value in shapes(src.read(1), transform=src.transform):
+            if value == 255:
+                features.append({
+                    "geometry": shape(geom), "value": value})
+    
+        gdf = gpd.GeoDataFrame(features, crs=src.crs)
+        gdf.to_file(output_vector, driver="GPKG")
