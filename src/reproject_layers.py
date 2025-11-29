@@ -15,7 +15,7 @@ def reproject_naip_image(aoi_name, dst_crs, raw_folder):
 def reproject_tree_mask(aoi_name, dst_crs, raw_folder):
 
     input_raster = raw_folder / f"{aoi_name}_tree_mask.tif"
-    output_raster = raw_folder / f"{aoi_name}tree_mask_reprojected.tif"
+    output_raster = raw_folder / f"{aoi_name}_tree_mask_reprojected.tif"
 
     reproject_raster_layer(dst_crs, input_raster, output_raster)
 

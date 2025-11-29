@@ -3,6 +3,7 @@ from pyproj import Transformer
 from utils.inputs import user_input, UserInput
 import geopandas as gpd
 import rasterio
+from rasterio.features import shapes
 from rasterio.warp import calculate_default_transform, reproject, Resampling
 
 
@@ -93,4 +94,15 @@ def reproject_vector_layer(dst_crs, input_vector, output_vector):
     gdf = gpd.read_file(input_vector)
     gdf = gdf.to_crs(dst_crs)
     gdf.to_file("{0}".format(output_vector), driver="GPKG")
-   
+
+def raster_to_vector(input_raster):
+    mask = None
+    with rasterio.Env():
+        with rasterio.open(input_raster) as src:
+            image = src.read(1) # first band
+            results = (
+            {'properties': {'raster_val': v}, 'geometry': s}
+            for i, (s, v) 
+            in enumerate(
+                shapes(image, mask=mask, transform=src.transform)))
+    return results
