@@ -123,3 +123,9 @@ def buffer_vector(simplified, distance):
     buffered = simplified.copy()
     buffered.geometry = buffered.geometry.buffer(distance)
     return buffered
+
+def clipping_vectors(input_vector, mask_vector, output_vector_path):
+    # Input: geodataframe with road buffers and tree buffers, output file path
+    # Saves intermediate geopackage with road buffers clipped by tree buffers
+    clipped = gpd.clip(input_vector, mask_vector, keep_geom_type=False, sort=False)
+    clipped.to_file(output_vector_path, driver="GPKG")
