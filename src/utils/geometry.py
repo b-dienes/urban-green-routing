@@ -129,3 +129,12 @@ def clipping_vectors(input_vector, mask_vector, output_vector_path):
     # Saves intermediate geopackage with road buffers clipped by tree buffers
     clipped = gpd.clip(input_vector, mask_vector, keep_geom_type=False, sort=False)
     clipped.to_file(output_vector_path, driver="GPKG")
+
+def calculate_area(input):
+    aread = input.copy()
+    aread['area'] = aread.geometry.area
+    return aread
+
+def join_by_attribute(input, join):
+    joined = input.merge(join, on='id', how='left')
+    return joined
