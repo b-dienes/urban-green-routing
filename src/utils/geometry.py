@@ -90,8 +90,10 @@ def reproject_vector_layer(dst_crs, input_vector, output_vector):
     gdf = gdf.to_crs(dst_crs)
     gdf.to_file(output_vector, driver="GPKG")
 
-def raster_to_vector(input_raster, output_vector):
-    with rasterio.open(input_raster) as src:
+def raster_to_vector(input_raster_path, output_vector_path):
+    # Input: input raster path,output vector path
+    # Saves intermediate geopackage with tree features
+    with rasterio.open(input_raster_path) as src:
         features = []
         for geom, value in shapes(src.read(1), transform=src.transform):
             if value == 255:
@@ -99,19 +101,25 @@ def raster_to_vector(input_raster, output_vector):
                     "geometry": shape(geom), "value": value})
     
         gdf = gpd.GeoDataFrame(features, crs=src.crs)
-        gdf.to_file(output_vector, driver="GPKG")
+        gdf.to_file(output_vector_path, driver="GPKG")
 
 def dissolve_vector(input_vector):
-    gdf = gpd.read_file(input_vector)
-    dissolved = gdf.dissolve(by=None, method='coverage')
+    # Input: input vector geodataframe
+    # Returns a geodataframe with dissolved features 
+    dissolved = input_vector.copy()
+    dissolved = dissolved.dissolve(by=None, method='coverage')
     return dissolved
 
-def simplify_vector(dissolved):
-    gdf= dissolved
-    simplified = gdf.GeoSeries.simplify(2.5, preserve_topology=True)
+def simplify_vector(dissolved, tolerance):
+    # Input: geodataframe from the dissolve_vector() function
+    # Returns a geodataframe with simplified geometries
+    simplified = dissolved.copy()
+    simplified.geometry = simplified.geometry.simplify(tolerance, preserve_topology=True)
     return simplified
 
-def buffer_vector(simplified):
-    gdf = simplified
-    buffered = gdf.GeoSeries.buffer(5.0)
+def buffer_vector(simplified, distance):
+    # Input: geodataframe e.g. from the simplify_vector() function
+    # Returns a geodataframe with buffered geometries 
+    buffered = simplified.copy()
+    buffered.geometry = buffered.geometry.buffer(distance)
     return buffered
