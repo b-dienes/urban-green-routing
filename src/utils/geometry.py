@@ -117,6 +117,13 @@ def simplify_vector(dissolved, tolerance):
     simplified.geometry = simplified.geometry.simplify(tolerance, preserve_topology=True)
     return simplified
 
+def add_id(gdf, id_vector_path):
+    # Returns and also saves geodataframe with unique ID field
+    gdf = gdf.copy()
+    gdf['id'] = range(1, len(gdf)+1)
+    gdf.to_file(id_vector_path, driver="GPKG")
+    return gdf
+
 def buffer_vector(simplified, distance):
     # Input: geodataframe e.g. from the simplify_vector() function
     # Returns a geodataframe with buffered geometries 
@@ -130,11 +137,15 @@ def clipping_vectors(input_vector, mask_vector, output_vector_path):
     clipped = gpd.clip(input_vector, mask_vector, keep_geom_type=False, sort=False)
     clipped.to_file(output_vector_path, driver="GPKG")
 
-def calculate_area(input):
-    aread = input.copy()
+def calculate_area(gdf):
+    aread = gdf.copy()
     aread['area'] = aread.geometry.area
     return aread
 
-def join_by_attribute(input, join):
-    joined = input.merge(join, on='id', how='left')
+def join_by_attribute(gdf, join):
+    joined = gdf.merge(join[['id','area']], on='id', how='left')
     return joined
+
+def calculate_greendex(gdf):
+    gdf['greendex'] = gdf['area_y'] /gdf['area_x']
+    return gdf
