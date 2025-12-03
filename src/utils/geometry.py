@@ -157,7 +157,7 @@ def calculate_greendex(gdf):
     # Normalize the greendex and length fields (0 - best, 1 - worst)    
     length_norm = (gdf['length'] - gdf['length'].min()) / (gdf['length'].max() - gdf['length'].min())
     green_norm = 1 - gdf['greendex']
-    gdf['cost'] = length_norm * green_norm #Alternative idea: α * length_norm + β * green_norm
-    gdf['cost'] = gdf['cost'].round(4)
+    gdf['weight'] = length_norm * green_norm #Alternative idea: α * length_norm + β * green_norm
+    gdf['weight'] = gdf['weight'].round(4)
 
     return gdf

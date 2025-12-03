@@ -74,10 +74,10 @@ def calculate_areas(aoi_name, raw_folder):
 def process_vectors(user_input: UserInput):
     aoi_name = user_input.aoi_name
     raw_folder = get_data_folder("raw")
-    extract_tree_polygons(aoi_name, raw_folder)
-    tree_buffer(aoi_name, raw_folder)
-    road_buffer(aoi_name, raw_folder)
-    clip_roads(aoi_name, raw_folder)
+    #extract_tree_polygons(aoi_name, raw_folder)
+    #tree_buffer(aoi_name, raw_folder)
+    #road_buffer(aoi_name, raw_folder)
+    #clip_roads(aoi_name, raw_folder)
     calculate_areas(aoi_name, raw_folder)
 
 if __name__ == "__main__":
