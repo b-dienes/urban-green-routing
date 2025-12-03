@@ -140,6 +140,7 @@ def clipping_vectors(input_vector, mask_vector, output_vector_path):
 def calculate_area(gdf):
     aread = gdf.copy()
     aread['area'] = aread.geometry.area
+    aread['area'] = aread['area'].fillna(0)
     return aread
 
 def join_by_attribute(gdf, join):
@@ -147,5 +148,16 @@ def join_by_attribute(gdf, join):
     return joined
 
 def calculate_greendex(gdf):
-    gdf['greendex'] = gdf['area_y'] /gdf['area_x']
+    # Area fields: area_x (street buffer area), area_y (tree overlay area): this can be shorter
+    # If greendex is NaN: replace with 0
+    gdf['greendex'] = gdf['area_y'] / gdf['area_x']
+    gdf['greendex'] = gdf['greendex'].fillna(0)
+    gdf['greendex'] = gdf['greendex'].round(4)
+
+    # Normalize the greendex and length fields (0 - best, 1 - worst)    
+    length_norm = (gdf['length'] - gdf['length'].min()) / (gdf['length'].max() - gdf['length'].min())
+    green_norm = 1 - gdf['greendex']
+    gdf['cost'] = length_norm * green_norm #Alternative idea: α * length_norm + β * green_norm
+    gdf['cost'] = gdf['cost'].round(4)
+
     return gdf
