@@ -10,9 +10,16 @@ def green_routing(user_input: UserInput):
     aoi_name = user_input.aoi_name
     raw_folder = get_data_folder("raw")
 
+    routing_source = user_input.routing_source
+    routing_target = user_input.routing_target
+    routing_weight = user_input.routing_weight.value
+
     nodes_path = raw_folder / f"{aoi_name}_nodes.gpkg"
     edges_path = raw_folder / f"{aoi_name}_edges_greendex.gpkg"
-    output_route_path = raw_folder / f"{aoi_name}_route.gpkg"
+    output_route_path = raw_folder / f"{aoi_name}_route_{routing_weight}.gpkg"
+
+    if user_input.routing_source is None:
+        raise ValueError("Hold your horses! Source OSM ID is missing!")
 
     nodes = gpd.read_file(nodes_path)
     edges = gpd.read_file(edges_path)
@@ -32,12 +39,12 @@ def green_routing(user_input: UserInput):
             greendex=row['greendex']
         )
 
-    source = nodes['osmid'].iloc[0]
-    target = nodes['osmid'].iloc[-1]
+    source = routing_source
+    target = routing_target
     print("Source: ", source)
     print("Target: ", target)
 
-    path = nx.shortest_path(G, source=source, target=target, weight='weight')
+    path = nx.shortest_path(G, source=source, target=target, weight=routing_weight)
     print("Shortest path (greenness + length):", path)
 
     # Build list of ordered edge pairs
