@@ -1,3 +1,4 @@
+from pathlib import Path
 import geopandas as gpd
 import networkx as nx
 from shapely.ops import linemerge
@@ -8,7 +9,7 @@ from utils.inputs import user_input, UserInput
 class GreenRouting:
     """Encapsulates the routing workflow for an AOI using graph data built from nodes and edges."""
 
-    def __init__(self, user_input, raw_folder, processed_folder):
+    def __init__(self, user_input: UserInput, raw_folder: Path, processed_folder: Path):
         """
         Initialize the routing object with user input and folder paths.
         
@@ -17,9 +18,9 @@ class GreenRouting:
             raw_folder (Path): Folder where raw node and edge files are stored
             processed_folder (Path): Folder where processed outputs will be saved
         """
-        self.user_input = user_input
-        self.raw_folder = raw_folder
-        self.processed_folder = processed_folder
+        self.user_input: UserInput = user_input
+        self.raw_folder: Path = raw_folder
+        self.processed_folder: Path = processed_folder
 
     def create_graph(self):
         """
@@ -51,10 +52,15 @@ class GreenRouting:
 
     def create_route(self):
         """
-        Compute the shortest path (nodes only) from routing source to target using the routing weight.
-        
-        Side effects:
-            Sets self.path (list of node IDs)
+            Compute the shortest path as a list of nodes from routing source to target 
+            using the routing weight.
+
+            Note:
+                This path includes nodes only; corresponding edges are filtered and 
+                processed later in subsequent methods.
+
+            Side effects:
+                Sets self.path (list of node IDs)
         """
         routing_source = self.user_input.routing_source
         routing_target = self.user_input.routing_target
