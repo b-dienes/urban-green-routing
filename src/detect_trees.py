@@ -1,3 +1,4 @@
+from pathlib import Path
 import detectree as dtr
 import rasterio
 import numpy as np
@@ -5,39 +6,66 @@ from utils.paths import get_data_folder
 from utils.inputs import user_input, UserInput
 
 
-def load_classifier():
-    # Load pre-trained classifier
-    clf = dtr.Classifier()
-    print("Classifier loaded")
-    return clf
+class DetectTrees:
+    """
+    Detect trees from a NAIP TIFF using detectree, and save a mask raster.
+    """
+    def __init__(self, user_input: UserInput, raw_folder: Path):
+        """
+        Initialize with user input and folder containing the TIFF file.
 
-def mask_predictor(clf, input_tif):
-    # Predict tree mask
-    mask_array = clf.predict_img(input_tif)  # Returns a numpy array directly
+        Args:
+            user_input (UserInput): AOI information including name.
+            raw_folder (Path): Folder where input and output files are stored.
+        """
+        self.user_input: UserInput = user_input
+        self.raw_folder: Path = raw_folder
+        self.input_tif = self.raw_folder / f"{self.user_input.aoi_name}.tif"
 
-    mask_vis = (mask_array * 255).astype(np.uint8) # Scale mask for visualization (0 -> 0, 1 -> 255)
-    print("Tree mask predicted")
-    return mask_vis
+    def load_classifier(self):
+        """
+        Load pre-trained Detectree classifier and store it in self.clf.
+        """
+        clf = dtr.Classifier()
+        print("Classifier loaded")
+        self.clf = clf
 
-def mask_saver(mask_vis, input_tif, output_path):
-    # Save mask
-    with rasterio.open(input_tif) as src:
-        meta = src.meta.copy()
-        meta.update(dtype=rasterio.uint8, count=1)  # Update metadata for single-band uint8 mask
-    with rasterio.open(output_path, 'w', **meta) as dst:
-        dst.write(mask_vis, 1)
-    print("Done! Saved tree mask.")
+    def mask_predictor(self):
+        """
+        Predict a tree mask from the input TIFF and store it in self.mask_vis.
 
-def tree_detector(user_input: UserInput):
-    aoi_name = user_input.aoi_name
-    raw_folder = get_data_folder("raw")
-    input_tif = raw_folder / f"{aoi_name}.tif"
-    output_path = raw_folder / f"{aoi_name}_tree_mask.tif"
+        The classifier returns a NumPy array of 0/1 values. This method converts it
+        to an 8-bit visualization mask (0 → 0, 1 → 255).
+        """
+        mask_array = self.clf.predict_img(self.input_tif)
+        mask_vis = (mask_array * 255).astype(np.uint8)
+        print("Tree mask predicted")
+        self.mask_vis = mask_vis
 
-    clf = load_classifier()
-    mask_vis = mask_predictor(clf, input_tif)
-    mask_saver(mask_vis, input_tif, output_path)
+    def mask_saver(self):
+        """
+        Save the predicted mask as a single-band uint8 TIFF.
+        """
+        output_path = self.raw_folder / f"{self.user_input.aoi_name}_tree_mask.tif"
+
+        with rasterio.open(self.input_tif) as src:
+            meta = src.meta.copy()
+            meta.update(dtype=rasterio.uint8, count=1)
+        with rasterio.open(output_path, 'w', **meta) as dst:
+            dst.write(self.mask_vis, 1)
+        print("Done! Saved tree mask.")
+
+    def tree_detector(self):
+        """
+        Run the full detection pipeline: load model, predict mask, save output.
+        """
+        self.load_classifier()
+        self.mask_predictor()
+        self.mask_saver()
 
 if __name__ == "__main__":
     user_input = user_input()
-    tree_detector(user_input)
+    raw_folder = get_data_folder("raw")
+
+    detect_trees = DetectTrees(user_input, raw_folder)
+    detect_trees.tree_detector()
