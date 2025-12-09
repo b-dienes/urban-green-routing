@@ -35,7 +35,6 @@ class GreenRouting:
         nodes = gpd.read_file(nodes_path)
         edges = gpd.read_file(edges_path)
 
-        # Loop through nodes and edges row by row and add values to graph
         G = nx.DiGraph()
         for idx, row in nodes.iterrows():
             G.add_node(row['osmid'], x=row.geometry.x, y=row.geometry.y)
@@ -46,7 +45,6 @@ class GreenRouting:
                 weight=row['weight'],
                 length=row['length']
             )
-
         self.graph = G
         self.edges = edges
 
@@ -62,12 +60,11 @@ class GreenRouting:
             Side effects:
                 Sets self.path (list of node IDs)
         """
-        routing_source = self.user_input.routing_source
-        routing_target = self.user_input.routing_target
-
-        routing_weight = self.user_input.routing_weight.value
-
-        path = nx.shortest_path(self.graph, source=routing_source, target=routing_target, weight=routing_weight)
+        path = nx.shortest_path(
+            self.graph,
+            source=self.user_input.routing_source,
+            target=self.user_input.routing_target,
+            weight=self.user_input.routing_weight.value)
         self.path = path
 
     def create_edgepairs(self):
@@ -120,9 +117,7 @@ class GreenRouting:
         Side effects:
             Writes a GeoPackage file at self.raw_folder
         """
-        aoi_name = self.user_input.aoi_name
-        routing_weight = self.user_input.routing_weight.value
-        output_route_path = self.raw_folder / f"{aoi_name}_route_{routing_weight}.gpkg"
+        output_route_path = self.processed_folder / f"{self.user_input.aoi_name}_route_{self.user_input.routing_weight.value}.gpkg"
 
         route_gdf = gpd.GeoDataFrame(
             {
