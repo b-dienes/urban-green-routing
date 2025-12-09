@@ -1,50 +1,81 @@
-# Import libraries
+from pathlib import Path
 import requests
 from utils.paths import get_data_folder
 from utils.inputs import user_input, UserInput
 from utils.geometry import bounding_box_mercator, tile_calculator, BoundingBoxMercator
 
 
-def naip_request(bbox_mercator: BoundingBoxMercator, width, height):
-    print('NAIP DOWNLOADER RUNNING')
-    xmin = bbox_mercator.xmin
-    ymin = bbox_mercator.ymin
-    xmax = bbox_mercator.xmax
-    ymax = bbox_mercator.ymax
+class DownloadNaip:
+    """
+    Downloads NAIP imagery for a specified area of interest (AOI)
+    and saves it to a local folder.
+    """
+    def __init__(self, user_input: UserInput, bbox_mercator: BoundingBoxMercator, width, height, raw_folder: Path):
+        """
+        Initialize DownloadNaip with user input, bounding box, image dimensions, and output folder.
 
-    url = "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage"
-    params = {
-    "bbox": str(xmin) + ',' + str(ymin) + ',' + str(xmax) + ',' + str(ymax),
-    "bboxSR": 102100,
-    "imageSR": 102100,
-    "size": str(width) + ',' + str(height),
-    "adjustAspectRatio": True,
-    "format": "tiff",
-    "f": "image",
-    "dpi":96}
+        Args:
+            user_input (UserInput): User input object.
+            bbox_mercator (BoundingBoxMercator): Bounding box object in Web Mercator coordinates for the AOI.
+            width (int): Width of the output image.
+            height (int): Height of the output image.
+            raw_folder (Path): Directory where the image will be saved.
+        """
+        self.user_input: UserInput = user_input
+        self.raw_folder: Path = raw_folder
+        self.bbox_mercator: BoundingBoxMercator = bbox_mercator
+        self.width = width
+        self.height = height
 
-    response = requests.get(url, params=params)
-    return response.content
+    def naip_request(self):
+        """
+        Send a request to the NAIP ImageServer to download imagery for the specified bounding box.
+        """
+        print('NAIP DOWNLOADER RUNNING')
+        xmin = self.bbox_mercator.xmin
+        ymin = self.bbox_mercator.ymin
+        xmax = self.bbox_mercator.xmax
+        ymax = self.bbox_mercator.ymax
 
-def naip_save(user_input: UserInput, response_content, output_folder):
-    aoi_name = user_input.aoi_name
-    output_path = output_folder / f"{aoi_name}.tif"
+        url = "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage"
+        params = {
+        "bbox": str(xmin) + ',' + str(ymin) + ',' + str(xmax) + ',' + str(ymax),
+        "bboxSR": 102100,
+        "imageSR": 102100,
+        "size": str(self.width) + ',' + str(self.height),
+        "adjustAspectRatio": True,
+        "format": "tiff",
+        "f": "image",
+        "dpi":96}
 
-    with open(output_path, 'wb') as f:
-            f.write(response_content)
+        response = requests.get(url, params=params)
+        self.response_content = response.content
 
-    print('NAIP DOWNLOADER FINISHED: ', output_path)
+    def naip_save(self):
+        """
+        Save the downloaded NAIP image to the raw data folder.
+        """
+        aoi_name = self.user_input.aoi_name
+        output_path = self.raw_folder / f"{aoi_name}.tif"
 
-def naip_downloader(user_input: UserInput, bbox_mercator: BoundingBoxMercator, width, height):
+        with open(output_path, 'wb') as f:
+                f.write(self.response_content)
 
-    response_content = naip_request(bbox_mercator, width, height)
+        print('NAIP DOWNLOADER FINISHED: ', output_path)
 
-    output_folder = get_data_folder("raw")
-
-    naip_save(user_input, response_content, output_folder)
+    def naip_downloader(self):
+        """
+        Orchestrates the download and save process.
+        Calls naip_request() to get image data and naip_save() to write it to disk.
+        """
+        self.naip_request()
+        self.naip_save()
 
 if __name__ == "__main__":
     user_input = user_input()
     bbox_mercator = bounding_box_mercator(user_input)
     width, height = tile_calculator(bbox_mercator, user_input.resolution)
-    naip_downloader(user_input, bbox_mercator, width, height)
+    raw_folder = get_data_folder("raw")
+
+    download_naip = DownloadNaip(user_input, bbox_mercator, width, height, raw_folder)
+    download_naip.naip_downloader()
