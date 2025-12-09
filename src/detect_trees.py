@@ -27,7 +27,6 @@ class DetectTrees:
         Load pre-trained Detectree classifier and store it in self.clf.
         """
         clf = dtr.Classifier()
-        print("Classifier loaded")
         self.clf = clf
 
     def mask_predictor(self):
@@ -39,7 +38,6 @@ class DetectTrees:
         """
         mask_array = self.clf.predict_img(self.input_tif)
         mask_vis = (mask_array * 255).astype(np.uint8)
-        print("Tree mask predicted")
         self.mask_vis = mask_vis
 
     def mask_saver(self):
@@ -53,7 +51,6 @@ class DetectTrees:
             meta.update(dtype=rasterio.uint8, count=1)
         with rasterio.open(output_path, 'w', **meta) as dst:
             dst.write(self.mask_vis, 1)
-        print("Done! Saved tree mask.")
 
     def tree_detector(self):
         """
