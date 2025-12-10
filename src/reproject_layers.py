@@ -21,45 +21,30 @@ class ReprojectLayers:
         self.dst_crs = dst_crs
         self.raw_folder = raw_folder
 
-    def reproject_naip_image(self):
-        """
-        Reproject the NAIP TIFF to the target CRS.
-        """
-        input_raster = self.raw_folder / f"{self.user_input.aoi_name}.tif"
-        output_raster = self.raw_folder / f"{self.user_input.aoi_name}_reprojected.tif"
 
-        reproject_raster_layer(self.dst_crs, input_raster, output_raster)
+    def reproject_all_layers(self):
 
-    def reproject_tree_mask(self):
-        """
-        Reproject the predicted tree mask TIFF to the target CRS.
-        """
-        input_raster = self.raw_folder / f"{self.user_input.aoi_name}_tree_mask.tif"
-        output_raster = self.raw_folder / f"{self.user_input.aoi_name}_tree_mask_reprojected.tif"
+        LAYERS = [
+            {"input": "{aoi}.tif", "output": "{aoi}_reprojected.tif", "func": reproject_raster_layer},
+            {"input": "{aoi}_tree_mask.tif", "output": "{aoi}_tree_mask_reprojected.tif", "func": reproject_raster_layer},
+            {"input": "{aoi}_edges.gpkg", "output": "{aoi}_edges_reprojected.gpkg", "func": reproject_vector_layer}
+        ]
 
-        reproject_raster_layer(self.dst_crs, input_raster, output_raster)
-
-    def reproject_osm_edges(self):
-        """
-        Reproject the OSM edges GeoPackage to the target CRS.
-        """
-        input_vector = self.raw_folder / f"{self.user_input.aoi_name}_edges.gpkg"
-        output_vector = self.raw_folder / f"{self.user_input.aoi_name}_edges_reprojected.gpkg"
-
-        reproject_vector_layer(self.dst_crs, input_vector, output_vector)
+        for layer in LAYERS:
+            input_path = self.raw_folder / layer["input"].format(aoi=self.user_input.aoi_name)
+            output_path = self.raw_folder / layer["output"].format(aoi=self.user_input.aoi_name)
+            layer["func"](self.dst_crs, input_path, output_path)
 
     def reproject_layers(self):
         """
         Reproject all layers (NAIP, tree mask, OSM edges) to the target CRS.
         """
-        self.reproject_naip_image()
-        self.reproject_tree_mask()
-        self.reproject_osm_edges()
+        self.reproject_all_layers()
 
 if __name__ == "__main__":
     user_input = user_input()
     dst_crs = 'EPSG:5070' # EPSG:5070 for testing. Later it can change dynamically.
     raw_folder = get_data_folder("raw")
 
-    reproject_layers = ReprojectLayers(user_input, dst_crs, raw_folder)
-    reproject_layers.reproject_layers()
+    reprojector = ReprojectLayers(user_input, dst_crs, raw_folder)
+    reprojector.reproject_layers()
