@@ -1,3 +1,4 @@
+from pathlib import Path
 import geopandas as gpd
 from utils.paths import get_data_folder
 from utils.inputs import user_input, UserInput
@@ -14,72 +15,79 @@ from utils.geometry import (
 )
 
 
-def extract_tree_polygons(aoi_name, raw_folder):
-    # Raster to vector: extract tree polygons
-    input_raster_path = raw_folder / f"{aoi_name}_tree_mask_reprojected.tif"
-    output_vector_path = raw_folder / f"{aoi_name}_tree_mask_polygons_reproj.gpkg"
-    raster_to_vector(input_raster_path,output_vector_path)
+class ProcessVectors:
 
-def tree_buffer(aoi_name, raw_folder):
-    # Buffers around trees
-    input_vector_path = raw_folder / f"{aoi_name}_tree_mask_polygons_reproj.gpkg"
-    output_vector_path = raw_folder / f"{aoi_name}_tree_buffer_polygons_reproj.gpkg"
+    def __init__(self, user_input: UserInput, raw_folder: Path):
+        self.user_input: UserInput = user_input
+        self.raw_folder: Path = raw_folder
 
-    result = gpd.read_file(input_vector_path).pipe(buffer_vector, distance = 1)
-    result.to_file(output_vector_path, driver="GPKG")
+    def extract_tree_polygons(self):
+        # Raster to vector: extract tree polygons
+        input_raster_path = self.raw_folder / f"{self.user_input.aoi_name}_tree_mask_reprojected.tif"
+        output_vector_path = self.raw_folder / f"{self.user_input.aoi_name}_tree_mask_polygons_reproj.gpkg"
+        raster_to_vector(input_raster_path,output_vector_path)
 
-def road_buffer(aoi_name, raw_folder):
-    # Buffers along roads
-    input_vector_path = raw_folder / f"{aoi_name}_edges_reprojected.gpkg"
-    id_vector_path =  raw_folder / f"{aoi_name}_edges_id_reprojected.gpkg"
-    output_vector_path = raw_folder / f"{aoi_name}_edges_buffer_reproj.gpkg"
+    def tree_buffer(self):
+        # Buffers around trees
+        input_vector_path = self.raw_folder / f"{self.user_input.aoi_name}_tree_mask_polygons_reproj.gpkg"
+        output_vector_path = self.raw_folder / f"{self.user_input.aoi_name}_tree_buffer_polygons_reproj.gpkg"
 
-    result = (
-        gpd.read_file(input_vector_path)
-        .pipe(add_id, id_vector_path)
-        .pipe(buffer_vector, 2.5)
-    )
-    result.to_file(output_vector_path, driver="GPKG")
+        result = gpd.read_file(input_vector_path).pipe(buffer_vector, distance = 1)
+        result.to_file(output_vector_path, driver="GPKG")
 
-def clip_roads(aoi_name, raw_folder):
-    # Clip road buffers with tree buffers
-    input_vector_path = raw_folder / f"{aoi_name}_edges_buffer_reproj.gpkg"
-    mask_vector_path = raw_folder / f"{aoi_name}_tree_buffer_polygons_reproj.gpkg"
-    output_vector_path = raw_folder / f"{aoi_name}_edges_buffer_clipped.gpkg"
+    def road_buffer(self):
+        # Buffers along roads
+        input_vector_path = self.raw_folder / f"{self.user_input.aoi_name}_edges_reprojected.gpkg"
+        id_vector_path =  self.raw_folder / f"{self.user_input.aoi_name}_edges_id_reprojected.gpkg"
+        output_vector_path = self.raw_folder / f"{self.user_input.aoi_name}_edges_buffer_reproj.gpkg"
 
-    input_vector = gpd.read_file(input_vector_path)
-    mask_vector = gpd.read_file(mask_vector_path)
+        result = (
+            gpd.read_file(input_vector_path)
+            .pipe(add_id, id_vector_path)
+            .pipe(buffer_vector, 2.5)
+        )
+        result.to_file(output_vector_path, driver="GPKG")
 
-    clipping_vectors(input_vector, mask_vector, output_vector_path)
+    def clip_roads(self):
+        # Clip road buffers with tree buffers
+        input_vector_path = self.raw_folder / f"{self.user_input.aoi_name}_edges_buffer_reproj.gpkg"
+        mask_vector_path = self.raw_folder / f"{self.user_input.aoi_name}_tree_buffer_polygons_reproj.gpkg"
+        output_vector_path = self.raw_folder / f"{self.user_input.aoi_name}_edges_buffer_clipped.gpkg"
 
-def calculate_areas(aoi_name, raw_folder):
-    road_buffer_path = raw_folder / f"{aoi_name}_edges_buffer_reproj.gpkg"
-    road_clip_path = raw_folder / f"{aoi_name}_edges_buffer_clipped.gpkg"
-    edges_path = raw_folder / f"{aoi_name}_edges_id_reprojected.gpkg"
-    output_vector_path = raw_folder / f"{aoi_name}_edges_greendex.gpkg"
+        input_vector = gpd.read_file(input_vector_path)
+        mask_vector = gpd.read_file(mask_vector_path)
 
-    # Area calculations
-    road_buffer_area = gpd.read_file(road_buffer_path).pipe(calculate_area)
-    road_clip_area = gpd.read_file(road_clip_path).pipe(calculate_area)
+        clipping_vectors(input_vector, mask_vector, output_vector_path)
 
-    # Join areas to edges based on ID and calculate green index
-    result = (
-        gpd.read_file(edges_path)
-        .pipe(join_by_attribute, road_buffer_area)
-        .pipe(join_by_attribute, road_clip_area)
-        .pipe(calculate_greendex)
-    )
-    result.to_file(output_vector_path, driver="GPKG")
+    def calculate_areas(self):
+        road_buffer_path = self.raw_folder / f"{self.user_input.aoi_name}_edges_buffer_reproj.gpkg"
+        road_clip_path = self.raw_folder / f"{self.user_input.aoi_name}_edges_buffer_clipped.gpkg"
+        edges_path = self.raw_folder / f"{self.user_input.aoi_name}_edges_id_reprojected.gpkg"
+        output_vector_path = self.raw_folder / f"{self.user_input.aoi_name}_edges_greendex.gpkg"
 
-def process_vectors(user_input: UserInput):
-    aoi_name = user_input.aoi_name
-    raw_folder = get_data_folder("raw")
-    #extract_tree_polygons(aoi_name, raw_folder)
-    #tree_buffer(aoi_name, raw_folder)
-    #road_buffer(aoi_name, raw_folder)
-    #clip_roads(aoi_name, raw_folder)
-    calculate_areas(aoi_name, raw_folder)
+        # Area calculations
+        road_buffer_area = gpd.read_file(road_buffer_path).pipe(calculate_area)
+        road_clip_area = gpd.read_file(road_clip_path).pipe(calculate_area)
+
+        # Join areas to edges based on ID and calculate green index
+        result = (
+            gpd.read_file(edges_path)
+            .pipe(join_by_attribute, road_buffer_area)
+            .pipe(join_by_attribute, road_clip_area)
+            .pipe(calculate_greendex)
+        )
+        result.to_file(output_vector_path, driver="GPKG")
+
+    def process_vectors(self):
+        self.extract_tree_polygons()
+        self.tree_buffer()
+        self.road_buffer()
+        self.clip_roads()
+        self.calculate_areas()
 
 if __name__ == "__main__":
     user_input = user_input()
-    process_vectors(user_input)
+    raw_folder = get_data_folder("raw")
+
+    process_vectors = ProcessVectors(user_input, raw_folder)
+    process_vectors.process_vectors()
