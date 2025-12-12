@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 import requests
 from utils.paths import get_data_folder
@@ -5,12 +6,14 @@ from utils.inputs import user_input, UserInput
 from utils.geometry import bounding_box_mercator, tile_calculator, BoundingBoxMercator
 
 
+logger = logging.getLogger(__name__)
+
 class DownloadNaip:
     """
     Downloads NAIP imagery for a specified area of interest (AOI)
     and saves it to a local folder.
     """
-    def __init__(self, user_input: UserInput, bbox_mercator: BoundingBoxMercator, width, height, raw_folder: Path):
+    def __init__(self, user_input: UserInput, bbox_mercator: BoundingBoxMercator, width: int, height: int, raw_folder: Path) -> None:
         """
         Initialize DownloadNaip with user input, bounding box, image dimensions, and output folder.
 
@@ -27,11 +30,13 @@ class DownloadNaip:
         self.width = width
         self.height = height
 
-    def naip_request(self):
+    def naip_request(self) -> None:
         """
         Send a request to the NAIP ImageServer to download imagery for the specified bounding box.
         """
-        print('NAIP DOWNLOADER RUNNING')
+        
+        logger.info("NAIP download started")
+
         xmin = self.bbox_mercator.xmin
         ymin = self.bbox_mercator.ymin
         xmax = self.bbox_mercator.xmax
@@ -51,7 +56,7 @@ class DownloadNaip:
         response = requests.get(url, params=params)
         self.response_content = response.content
 
-    def naip_save(self):
+    def naip_save(self) -> None:
         """
         Save the downloaded NAIP image to the raw data folder.
         """
@@ -61,9 +66,9 @@ class DownloadNaip:
         with open(output_path, 'wb') as f:
                 f.write(self.response_content)
 
-        print('NAIP DOWNLOADER FINISHED: ', output_path)
-
-    def naip_downloader(self):
+        logger.info("NAIP download finished")
+        
+    def naip_downloader(self) -> None:
         """
         Orchestrates the download and save process.
         Calls naip_request() to get image data and naip_save() to write it to disk.
