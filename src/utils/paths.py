@@ -1,7 +1,10 @@
+import logging
 from pathlib import Path
 
 
-def get_data_folder(subfolder="raw"):
+logger = logging.getLogger(__name__)
+
+def get_data_folder(subfolder: str = "raw") -> Path:
     """
     Returns the absolute path to a project data subfolder, creating it if necessary.
 
@@ -18,6 +21,7 @@ def get_data_folder(subfolder="raw"):
     project_root = Path.home() / "urban-green-routing" / "data"
     folder = project_root / subfolder
     folder.mkdir(parents=True, exist_ok=True)
-    print("FOLDER: ", folder)
-    #return str(folder)
+
+    logger.info("Data folder path: %s", folder)
+
     return folder
