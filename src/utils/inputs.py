@@ -7,17 +7,17 @@ class RoutingPreference(Enum):
 
 @dataclass
 class UserInput:
-    aoi_name: object
-    sw_lat: object
-    sw_lon: object
-    ne_lat: object
-    ne_lon: object
-    resolution: object
-    routing_source: object = None
-    routing_target: object = None
+    aoi_name: str
+    sw_lat: float
+    sw_lon: float
+    ne_lat: float
+    ne_lon: float
+    resolution: float
+    routing_source: int | None = None
+    routing_target: int | None = None
     routing_weight: RoutingPreference = RoutingPreference.GREENEST
 
-def user_input():
+def user_input() -> UserInput:
     # USER INPUT:
     # SW and NE coordinates (lon, lat)
     # Resolution (min: 0.6 meter/pixel is the highest possible in NAIP)
