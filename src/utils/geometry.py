@@ -1,4 +1,11 @@
+"""
+Geometry utilities for performing geospatial coordinate transformations,
+tiling calculations, and other spatial processing steps used in the pipeline.
+"""
+
+import logging
 from dataclasses import dataclass
+from typing import Tuple
 from pyproj import Transformer
 from utils.inputs import user_input, UserInput
 import geopandas as gpd
@@ -8,25 +15,37 @@ from shapely.geometry import shape
 from rasterio.warp import calculate_default_transform, reproject, Resampling
 
 
+logger = logging.getLogger(__name__)
+
 @dataclass
 class BoundingBoxMercator:
-    xmin: object
-    ymin: object
-    xmax: object
-    ymax: object
+    """
+    Web Mercator representation of a geographic bounding box.
+    Stores projected xmin, ymin, xmax, ymax coordinates in meters.
+    """
+    xmin: float
+    ymin: float
+    xmax: float
+    ymax: float
 
-def bounding_box_mercator(user_input: UserInput):
-    # This function transforms a two WGS84 (lat-long) coordinate pairs to Web Mercator
+def bounding_box_mercator(user_input: UserInput) -> BoundingBoxMercator:
+    """
+    Convert user-defined WGS84 bounding box into Web Mercator coordinates.
+
+    Parameters:
+        user_input (UserInput): User-provided spatial extent and parameters.
+
+    Returns:
+        BoundingBoxMercator: Bounding box in EPSG:3857 (Web Mercator).
+    """
 
     sw_lon = user_input.sw_lon
     sw_lat = user_input.sw_lat
     ne_lon = user_input.ne_lon
     ne_lat = user_input.ne_lat
 
-    # Transform from WGS84 to Web Mercator
     transformer = Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)
 
-    # Transformation done here
     xmin, ymin = transformer.transform(sw_lon, sw_lat)
     xmax, ymax = transformer.transform(ne_lon, ne_lat)
 
@@ -36,8 +55,18 @@ def bounding_box_mercator(user_input: UserInput):
         xmax = xmax,
         ymax = ymax)
 
-def tile_calculator(bbox_mercator: BoundingBoxMercator, resolution):
-    # This function calculates width and height required for the NAIP request
+def tile_calculator(bbox_mercator: BoundingBoxMercator, resolution: float) -> Tuple[int, int]:
+    """
+    Compute output raster width and height (in pixels) from a
+    Web Mercator bounding box and a target spatial resolution.
+
+    Parameters:
+        bbox_mercator (BoundingBoxMercator): Bounding box in EPSG:3857.
+        resolution (float): Target resolution in meters per pixel.
+
+    Returns:
+        Tuple[int, int]: (width, height) in pixels.
+    """
 
     xmin = bbox_mercator.xmin
     ymin = bbox_mercator.ymin
@@ -46,9 +75,10 @@ def tile_calculator(bbox_mercator: BoundingBoxMercator, resolution):
 
     width  = int(round((xmax - xmin) / resolution))
     height = int(round((ymax - ymin) / resolution))
-    print('Width: ', width)
-    print('Height: ', height)
- 
+
+    logger.info("Width: %d", width)
+    logger.info("Height: %d", height) 
+
     return width, height
 
 def bounding_box_osm(user_input: UserInput):
