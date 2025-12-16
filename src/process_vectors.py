@@ -1,11 +1,10 @@
+import logging
 from pathlib import Path
 import geopandas as gpd
 from utils.paths import get_data_folder
 from utils.inputs import user_input, UserInput
 from utils.geometry import (
     raster_to_vector,
-    dissolve_vector,
-    simplify_vector,
     add_id,
     buffer_vector,
     clipping_vectors,
@@ -15,13 +14,15 @@ from utils.geometry import (
 )
 
 
+logger = logging.getLogger(__name__)
+
 class ProcessVectors:
     """
     Processing pipeline that extracts tree polygons, creates buffers,
     clips road buffers, and computes greendex metrics for road segments.
     """
 
-    def __init__(self, user_input: UserInput, raw_folder: Path):
+    def __init__(self, user_input: UserInput, raw_folder: Path) -> None:
         """
         Initialize the processing object with user input and folder paths.
         
@@ -32,15 +33,16 @@ class ProcessVectors:
         self.user_input: UserInput = user_input
         self.raw_folder: Path = raw_folder
 
-    def extract_tree_polygons(self):
+    def extract_tree_polygons(self) -> None:
         """
         Convert the tree raster mask into vector polygons.
         """
         input_raster_path = self.raw_folder / f"{self.user_input.aoi_name}_tree_mask_reprojected.tif"
         output_vector_path = self.raw_folder / f"{self.user_input.aoi_name}_tree_mask_polygons_reproj.gpkg"
         raster_to_vector(input_raster_path,output_vector_path)
+        logger.info("Tree raster mask converted to polygons: %s", output_vector_path)
 
-    def tree_buffer(self):
+    def tree_buffer(self) -> None:
         """
         Create buffer polygons around the extracted tree polygons to define influence zone around trees.
         """
@@ -49,8 +51,9 @@ class ProcessVectors:
 
         result = gpd.read_file(input_vector_path).pipe(buffer_vector, distance = 1)
         result.to_file(output_vector_path, driver="GPKG")
+        logger.info("Tree polygon buffer prepared: %s", output_vector_path)
 
-    def road_buffer(self):
+    def road_buffer(self) -> None:
         """
         Add unique IDs to road edges and generate buffer polygons around them.
         """
@@ -64,8 +67,9 @@ class ProcessVectors:
             .pipe(buffer_vector, 2.5)
         )
         result.to_file(output_vector_path, driver="GPKG")
+        logger.info("Road buffer prepared: %s", output_vector_path)
 
-    def clip_roads(self):
+    def clip_roads(self) -> None:
         """
         Clip road buffer polygons using tree buffer polygons.
         The result represents areas where trees overlap the road buffer zones.
@@ -78,8 +82,9 @@ class ProcessVectors:
         mask_vector = gpd.read_file(mask_vector_path)
 
         clipping_vectors(input_vector, mask_vector, output_vector_path)
+        logger.info("Road buffers clipped: %s", output_vector_path)
 
-    def calculate_areas(self):
+    def calculate_areas(self) -> None:
         """
         Compute road buffer and tree overlay areas, and calculate greendex metrics.
 
@@ -91,11 +96,9 @@ class ProcessVectors:
         edges_path = self.raw_folder / f"{self.user_input.aoi_name}_edges_id_reprojected.gpkg"
         output_vector_path = self.raw_folder / f"{self.user_input.aoi_name}_edges_greendex.gpkg"
 
-        # Area calculations
         road_buffer_area = gpd.read_file(road_buffer_path).pipe(calculate_area)
         road_clip_area = gpd.read_file(road_clip_path).pipe(calculate_area)
 
-        # Join areas to edges based on ID and calculate green index
         result = (
             gpd.read_file(edges_path)
             .pipe(join_by_attribute, road_buffer_area)
@@ -103,8 +106,9 @@ class ProcessVectors:
             .pipe(calculate_greendex)
         )
         result.to_file(output_vector_path, driver="GPKG")
+        logger.info("Greendex calculated: %s", output_vector_path)
 
-    def process_vectors(self):
+    def process_vectors(self) -> None:
         """
         Orchestrates the full vector workflow: tree extraction, buffering, clipping, and greendex calculation.
         """
