@@ -9,7 +9,7 @@ from utils.inputs import user_input, UserInput
 class GreenRouting:
     """Encapsulates the routing workflow for an AOI using graph data built from nodes and edges."""
 
-    def __init__(self, user_input: UserInput, raw_folder: Path, processed_folder: Path):
+    def __init__(self, user_input: UserInput, raw_folder: Path, processed_folder: Path) -> None:
         """
         Initialize the routing object with user input and folder paths.
         
@@ -22,7 +22,7 @@ class GreenRouting:
         self.raw_folder: Path = raw_folder
         self.processed_folder: Path = processed_folder
 
-    def create_graph(self):
+    def create_graph(self) -> None:
         """
         Build a directed graph from node and edge files in raw_folder.
         
@@ -48,7 +48,7 @@ class GreenRouting:
         self.graph = G
         self.edges = edges
 
-    def create_route(self):
+    def create_route(self) -> None:
         """
             Compute the shortest path as a list of nodes from routing source to target 
             using the routing weight.
@@ -67,7 +67,7 @@ class GreenRouting:
             weight=self.user_input.routing_weight.value)
         self.path = path
 
-    def create_edgepairs(self):
+    def create_edgepairs(self) -> None:
         """
         Build a list of ordered edge pairs from the nodes from self.path.
         
@@ -77,7 +77,7 @@ class GreenRouting:
         edge_pairs = list(zip(self.path[:-1], self.path[1:]))
         self.edge_pairs = edge_pairs
 
-    def retrieve_edges(self):
+    def retrieve_edges(self) -> None:
         """
         Retrieve the edges in order along the path from self.edge_pairs.
         
@@ -90,7 +90,7 @@ class GreenRouting:
             ordered_edges.append(match.iloc[0])
         self.ordered_edges = ordered_edges
 
-    def convert_edges(self):
+    def convert_edges(self) -> None:
         """
         Convert the ordered edges to a GeoDataFrame.
         
@@ -100,7 +100,7 @@ class GreenRouting:
         route_edges_gdf = gpd.GeoDataFrame(self.ordered_edges, crs=self.edges.crs)
         self.route_edges_gdf = route_edges_gdf
 
-    def merge_edges(self):
+    def merge_edges(self) -> None:
         """
         Merge the geometries of the route edges into a single LineString.
         
@@ -110,7 +110,7 @@ class GreenRouting:
         route_line = linemerge(self.route_edges_gdf.geometry.tolist())
         self.route_line = route_line
 
-    def save_route(self):
+    def save_route(self) -> None:
         """
         Save the route as a GeoPackage file in raw_folder.
         
@@ -129,7 +129,7 @@ class GreenRouting:
         )
         route_gdf.to_file(output_route_path, driver="GPKG")
 
-    def run_routing(self):
+    def run_routing(self) -> None:
         """
         Run the full routing workflow in sequence.
         
