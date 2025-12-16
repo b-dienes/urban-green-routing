@@ -80,16 +80,25 @@ def tile_calculator(bbox_mercator: BoundingBoxMercator, resolution: float) -> tu
 
     return width, height
 
-def bounding_box_osm(user_input: UserInput):
+def bounding_box_osm(user_input: UserInput) -> tuple[float, float, float, float]:
+    """
+    Construct an OpenStreetMap-compatible bounding box (WGS84) from user input.
+
+    Parameters:
+        user_input (UserInput): Object containing AOI coordinates (southwest and northeast corners).
+
+    Returns:
+        tuple[float, float, float, float]: Bounding box in the form (xmin, ymin, xmax, ymax)
+                                           corresponding to (left, bottom, right, top).
+    """
 
     xmin = user_input.sw_lon
     ymin = user_input.sw_lat
     xmax = user_input.ne_lon
     ymax = user_input.ne_lat
 
-    # OSM requires WGS84 bbox as tuple: left, bottom, right, top
     bbox_osm = (xmin, ymin, xmax, ymax)
-    print("bbox: ", bbox_osm)
+    logger.info("OSM bounding box (WGS84): West: %s, South: %s, East: %s, North: %s", xmin, ymin, xmax, ymax)
     return bbox_osm
 
 def reproject_raster_layer(dst_crs, input_raster, output_raster):
