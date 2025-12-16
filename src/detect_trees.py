@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 import detectree as dtr
 import rasterio
@@ -6,11 +7,13 @@ from utils.paths import get_data_folder
 from utils.inputs import user_input, UserInput
 
 
+logger = logging.getLogger(__name__)
+
 class DetectTrees:
     """
     Detect trees from a NAIP TIFF using detectree, and save a mask raster.
     """
-    def __init__(self, user_input: UserInput, raw_folder: Path):
+    def __init__(self, user_input: UserInput, raw_folder: Path) -> None:
         """
         Initialize with user input and folder containing the TIFF file.
 
@@ -22,14 +25,15 @@ class DetectTrees:
         self.raw_folder: Path = raw_folder
         self.input_tif = self.raw_folder / f"{self.user_input.aoi_name}.tif"
 
-    def load_classifier(self):
+    def load_classifier(self) -> None:
         """
         Load pre-trained Detectree classifier and store it in self.clf.
         """
         clf = dtr.Classifier()
         self.clf = clf
+        logger.info("Detectree classifier loaded for AOI: %s", self.user_input.aoi_name)
 
-    def mask_predictor(self):
+    def mask_predictor(self) -> None:
         """
         Predict a tree mask from the input TIFF and store it in self.mask_vis.
 
@@ -39,8 +43,9 @@ class DetectTrees:
         mask_array = self.clf.predict_img(self.input_tif)
         mask_vis = (mask_array * 255).astype(np.uint8)
         self.mask_vis = mask_vis
+        logger.info("Tree mask predicted")
 
-    def mask_saver(self):
+    def mask_saver(self) -> None:
         """
         Save the predicted mask as a single-band uint8 TIFF.
         """
@@ -51,8 +56,9 @@ class DetectTrees:
             meta.update(dtype=rasterio.uint8, count=1)
         with rasterio.open(output_path, 'w', **meta) as dst:
             dst.write(self.mask_vis, 1)
+        logger.info("Tree mask raster saved to %s", output_path)
 
-    def tree_detector(self):
+    def tree_detector(self) -> None:
         """
         Run the full detection pipeline: load model, predict mask, save output.
         """
