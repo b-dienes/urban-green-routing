@@ -47,7 +47,7 @@ class ReprojectLayers:
 
     def reproject_layers(self) -> None:
         """
-        Run the reproject pipeline for all AOI layers.
+        Run the reproject pipeline.
         """
         self.reproject_all_layers()
 
