@@ -4,6 +4,7 @@ tiling calculations, and other spatial processing steps used in the pipeline.
 """
 
 import logging
+from pathlib import Path
 from dataclasses import dataclass
 from pyproj import Transformer
 from utils.inputs import user_input, UserInput
@@ -101,7 +102,18 @@ def bounding_box_osm(user_input: UserInput) -> tuple[float, float, float, float]
     logger.info("OSM bounding box (WGS84): West: %s, South: %s, East: %s, North: %s", xmin, ymin, xmax, ymax)
     return bbox_osm
 
-def reproject_raster_layer(dst_crs, input_raster, output_raster):
+def reproject_raster_layer(dst_crs: str, input_raster: Path, output_raster: Path) -> None:
+    """
+    Reproject a raster to a target CRS and save the output as a new file.
+
+    Parameters:
+        dst_crs (str): Target coordinate reference system (e.g. 'EPSG:5070').
+        input_raster (Path): Path to the input raster file.
+        output_raster (Path): Path where the reprojected raster will be saved.
+
+    Returns:
+        None
+    """
     with rasterio.open(input_raster) as src:
         transform, width, height = calculate_default_transform(
             src.crs, dst_crs, src.width, src.height, *src.bounds)
@@ -123,7 +135,18 @@ def reproject_raster_layer(dst_crs, input_raster, output_raster):
                     dst_crs=dst_crs,
                     resampling=Resampling.nearest)
 
-def reproject_vector_layer(dst_crs, input_vector, output_vector):
+def reproject_vector_layer(dst_crs: str, input_vector: Path, output_vector: Path) -> None:
+    """
+    Reproject a vector file (GeoPackage) to a target CRS and save the output.
+
+    Parameters:
+        dst_crs (str): Target coordinate reference system (e.g. 'EPSG:5070').
+        input_vector (Path): Path to the input vector file.
+        output_vector (Path): Path where the reprojected vector will be saved.
+
+    Returns:
+        None
+    """
     gdf = gpd.read_file(input_vector)
     gdf = gdf.to_crs(dst_crs)
     gdf.to_file(output_vector, driver="GPKG")
