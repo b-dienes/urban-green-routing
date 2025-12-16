@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 import geopandas as gpd
 import networkx as nx
@@ -5,6 +6,8 @@ from shapely.ops import linemerge
 from utils.paths import get_data_folder
 from utils.inputs import user_input, UserInput
 
+
+logger = logging.getLogger(__name__)
 
 class GreenRouting:
     """Encapsulates the routing workflow for an AOI using graph data built from nodes and edges."""
@@ -47,6 +50,7 @@ class GreenRouting:
             )
         self.graph = G
         self.edges = edges
+        logger.info("Graph built from %s_nodes.gpkg and %s_edges_greendex.gpkg", self.user_input.aoi_name)
 
     def create_route(self) -> None:
         """
@@ -66,6 +70,7 @@ class GreenRouting:
             target=self.user_input.routing_target,
             weight=self.user_input.routing_weight.value)
         self.path = path
+        logger.info("Route nodes selected based on field: %s", self.user_input.routing_weight.value)
 
     def create_edgepairs(self) -> None:
         """
@@ -76,6 +81,7 @@ class GreenRouting:
         """
         edge_pairs = list(zip(self.path[:-1], self.path[1:]))
         self.edge_pairs = edge_pairs
+        logger.info("Edgepairs created")
 
     def retrieve_edges(self) -> None:
         """
@@ -89,6 +95,7 @@ class GreenRouting:
             match = self.edges[(self.edges["u"] == u) & (self.edges["v"] == v)]
             ordered_edges.append(match.iloc[0])
         self.ordered_edges = ordered_edges
+        logger.info("Edges along path selected")
 
     def convert_edges(self) -> None:
         """
@@ -99,6 +106,7 @@ class GreenRouting:
         """
         route_edges_gdf = gpd.GeoDataFrame(self.ordered_edges, crs=self.edges.crs)
         self.route_edges_gdf = route_edges_gdf
+        logger.info("Edges converted to GeoDataFrame")
 
     def merge_edges(self) -> None:
         """
@@ -109,6 +117,7 @@ class GreenRouting:
         """
         route_line = linemerge(self.route_edges_gdf.geometry.tolist())
         self.route_line = route_line
+        logger.info("Single linestring created")
 
     def save_route(self) -> None:
         """
@@ -128,6 +137,7 @@ class GreenRouting:
             crs=self.edges.crs
         )
         route_gdf.to_file(output_route_path, driver="GPKG")
+        logger.info("Route saved as %s: ", output_route_path)
 
     def run_routing(self) -> None:
         """
