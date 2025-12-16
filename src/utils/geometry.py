@@ -151,9 +151,20 @@ def reproject_vector_layer(dst_crs: str, input_vector: Path, output_vector: Path
     gdf = gdf.to_crs(dst_crs)
     gdf.to_file(output_vector, driver="GPKG")
 
-def raster_to_vector(input_raster_path, output_vector_path):
-    # Input: input raster path,output vector path
-    # Saves intermediate geopackage with tree features
+def raster_to_vector(input_raster_path: Path, output_vector_path: Path) -> None:
+    """
+    Convert a binary raster mask into vector polygons and save them as a GeoPackage.
+
+    Pixels with a grayscale value of 255 are extracted and converted to vector
+    geometries. All other pixel values are ignored.
+
+    Parameters:
+        input_raster_path (Path): Path to the input raster mask file.
+        output_vector_path (Path): Path where the output vector file will be saved.
+
+    Returns:
+        None
+    """
     with rasterio.open(input_raster_path) as src:
         features = []
         for geom, value in shapes(src.read(1), transform=src.transform):
@@ -164,61 +175,111 @@ def raster_to_vector(input_raster_path, output_vector_path):
         gdf = gpd.GeoDataFrame(features, crs=src.crs)
         gdf.to_file(output_vector_path, driver="GPKG")
 
-def dissolve_vector(input_vector):
-    # Input: input vector geodataframe
-    # Returns a geodataframe with dissolved features 
-    dissolved = input_vector.copy()
-    dissolved = dissolved.dissolve(by=None, method='coverage')
-    return dissolved
+def add_id(gdf: gpd.GeoDataFrame, id_vector_path: Path) -> gpd.GeoDataFrame:
+    """
+    Add a unique integer ID column to a GeoDataFrame and save the result.
 
-def simplify_vector(dissolved, tolerance):
-    # Input: geodataframe from the dissolve_vector() function
-    # Returns a geodataframe with simplified geometries
-    simplified = dissolved.copy()
-    simplified.geometry = simplified.geometry.simplify(tolerance, preserve_topology=True)
-    return simplified
+    Parameters:
+        gdf (GeoDataFrame): Input GeoDataFrame.
+        id_vector_path (Path): Path where the GeoDataFrame with IDs will be saved.
 
-def add_id(gdf, id_vector_path):
-    # Returns and also saves geodataframe with unique ID field
+    Returns:
+        GeoDataFrame: GeoDataFrame with an added unique 'id' column.
+    """
     gdf = gdf.copy()
     gdf['id'] = range(1, len(gdf)+1)
     gdf.to_file(id_vector_path, driver="GPKG")
     return gdf
 
-def buffer_vector(simplified, distance):
-    # Input: geodataframe e.g. from the simplify_vector() function
-    # Returns a geodataframe with buffered geometries 
-    buffered = simplified.copy()
+def buffer_vector(gdf: gpd.GeoDataFrame, distance: float) -> gpd.GeoDataFrame:
+    """
+    Create buffer geometries around input vector features.
+
+    Parameters:
+        gdf (GeoDataFrame): Input GeoDataFrame containing geometries to buffer.
+        distance (float): Buffer distance in CRS units.
+
+    Returns:
+        GeoDataFrame: GeoDataFrame with buffered geometries.
+    """
+    buffered = gdf.copy()
     buffered.geometry = buffered.geometry.buffer(distance)
     return buffered
 
-def clipping_vectors(input_vector, mask_vector, output_vector_path):
-    # Input: geodataframe with road buffers and tree buffers, output file path
-    # Saves intermediate geopackage with road buffers clipped by tree buffers
+def clipping_vectors(input_vector: gpd.GeoDataFrame, mask_vector: gpd.GeoDataFrame, output_vector_path: Path) -> None:
+    """
+    Clip input vector geometries using a mask vector and save the result.
+
+    Parameters:
+        input_vector (GeoDataFrame): GeoDataFrame containing features to be clipped.
+        mask_vector (GeoDataFrame): GeoDataFrame used as the clipping mask.
+        output_vector_path (Path): Path where the clipped vector file will be saved.
+
+    Returns:
+        None
+    """
     clipped = gpd.clip(input_vector, mask_vector, keep_geom_type=False, sort=False)
     clipped.to_file(output_vector_path, driver="GPKG")
 
-def calculate_area(gdf):
+def calculate_area(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """
+    Calculate polygon areas and store them in a new 'area' column.
+
+    Any missing or invalid area values are replaced with 0 to ensure
+    downstream calculations remain valid.
+
+    Parameters:
+        gdf (GeoDataFrame): Input GeoDataFrame with polygon geometries.
+
+    Returns:
+        GeoDataFrame: GeoDataFrame with an added 'area' column.
+    """
     aread = gdf.copy()
     aread['area'] = aread.geometry.area
     aread['area'] = aread['area'].fillna(0)
     return aread
 
-def join_by_attribute(gdf, join):
+def join_by_attribute(gdf: gpd.GeoDataFrame, join: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """
+    Join area attributes from another GeoDataFrame based on a shared ID field.
+
+    Parameters:
+        gdf (GeoDataFrame): Target GeoDataFrame.
+        join (GeoDataFrame): GeoDataFrame containing 'id' and 'area' columns.
+
+    Returns:
+        GeoDataFrame: GeoDataFrame with joined area attributes.
+    """
     joined = gdf.merge(join[['id','area']], on='id', how='left')
     return joined
 
-def calculate_greendex(gdf):
-    # Area fields: area_x (street buffer area), area_y (tree overlay area): this can be shorter
-    # If greendex is NaN: replace with 0
+def calculate_greendex(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """
+    Compute greendex and weight metrics for road segments based on green coverage.
+
+    Greendex is calculated as the ratio of tree-covered buffer area to total
+    road buffer area. Missing greendex values are replaced with 0.
+
+    Segment length is normalized to the range [0, 1].
+    
+    Greendex is inverted (1 - greendex) so that both metrics share the same directionality:
+    0 represents best conditions and 1 represents worst conditions.
+
+    Weight is computed as the product of normalized segment length and inverted greendex.
+
+    Parameters:
+        gdf (GeoDataFrame): GeoDataFrame containing area and length attributes.
+
+    Returns:
+        GeoDataFrame: GeoDataFrame with added 'greendex' and 'weight' columns.
+    """
     gdf['greendex'] = gdf['area_y'] / gdf['area_x']
     gdf['greendex'] = gdf['greendex'].fillna(0)
     gdf['greendex'] = gdf['greendex'].round(4)
 
-    # Normalize the greendex and length fields (0 - best, 1 - worst)    
     length_norm = (gdf['length'] - gdf['length'].min()) / (gdf['length'].max() - gdf['length'].min())
     green_norm = 1 - gdf['greendex']
-    gdf['weight'] = length_norm * green_norm #Alternative idea: α * length_norm + β * green_norm
+    gdf['weight'] = length_norm * green_norm
     gdf['weight'] = gdf['weight'].round(4)
 
     return gdf
