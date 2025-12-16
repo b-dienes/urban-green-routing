@@ -5,7 +5,6 @@ tiling calculations, and other spatial processing steps used in the pipeline.
 
 import logging
 from dataclasses import dataclass
-from typing import Tuple
 from pyproj import Transformer
 from utils.inputs import user_input, UserInput
 import geopandas as gpd
@@ -55,7 +54,7 @@ def bounding_box_mercator(user_input: UserInput) -> BoundingBoxMercator:
         xmax = xmax,
         ymax = ymax)
 
-def tile_calculator(bbox_mercator: BoundingBoxMercator, resolution: float) -> Tuple[int, int]:
+def tile_calculator(bbox_mercator: BoundingBoxMercator, resolution: float) -> tuple[int, int]:
     """
     Compute output raster width and height (in pixels) from a
     Web Mercator bounding box and a target spatial resolution.
