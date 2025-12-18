@@ -31,6 +31,10 @@ class ReprojectLayers:
 
         Uses the utility functions 'reproject_raster_layer' and 'reproject_vector_layer'
         depending on the layer type.
+
+        Raises:
+            PermissionError: If the output file cannot be written due to permissions.
+            RuntimeError: If the reprojection function fails for any reason.
         """
 
         LAYERS = [
@@ -42,7 +46,16 @@ class ReprojectLayers:
         for layer in LAYERS:
             input_path = self.raw_folder / layer["input"].format(aoi=self.user_input.aoi_name)
             output_path = self.raw_folder / layer["output"].format(aoi=self.user_input.aoi_name)
-            layer["func"](self.dst_crs, input_path, output_path)
+
+            try:
+                layer["func"](self.dst_crs, input_path, output_path)
+            except PermissionError:
+                logger.error("No permission to write reprojected layer to %s", output_path)
+                raise
+            except Exception as e:
+                logger.error("Reprojection failed for %s: %s", layer["input"].format(aoi=self.user_input.aoi_name), e)
+                raise
+
             logger.info("Layer reprojected: %s -> %s", layer["input"].format(aoi=self.user_input.aoi_name), layer["output"].format(aoi=self.user_input.aoi_name))
 
     def reproject_layers(self) -> None:
