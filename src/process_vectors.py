@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from functools import wraps
 import geopandas as gpd
 from utils.paths import get_data_folder
 from utils.inputs import user_input, UserInput
@@ -15,6 +16,29 @@ from utils.geometry import (
 
 
 logger = logging.getLogger(__name__)
+
+def handle_errors(method):
+    """
+    Decorator to wrap vector processing methods for error handling.
+
+    Raises:
+        MemoryError: If the processing step exhausts memory.
+        RuntimeError: For any other errors encountered during processing.
+
+    Returns:
+        the original method's result if successful.
+    """
+    @wraps(method)
+    def wrapper(*args, **kwargs):
+        try:
+            return method(*args, **kwargs)
+        except MemoryError as e:
+            logger.error("Memory error in %s: %s", method.__name__, e)
+            raise
+        except Exception as e:
+            logger.error("Error in %s: %s", method.__name__, e)
+            raise RuntimeError(f"{method.__name__} failed: {e}")
+    return wrapper
 
 class ProcessVectors:
     """
@@ -33,6 +57,7 @@ class ProcessVectors:
         self.user_input: UserInput = user_input
         self.raw_folder: Path = raw_folder
 
+    @handle_errors
     def extract_tree_polygons(self) -> None:
         """
         Convert the tree raster mask into vector polygons.
@@ -42,6 +67,7 @@ class ProcessVectors:
         raster_to_vector(input_raster_path,output_vector_path)
         logger.info("Tree raster mask converted to polygons: %s", output_vector_path)
 
+    @handle_errors
     def tree_buffer(self) -> None:
         """
         Create buffer polygons around the extracted tree polygons to define influence zone around trees.
@@ -53,6 +79,7 @@ class ProcessVectors:
         result.to_file(output_vector_path, driver="GPKG")
         logger.info("Tree polygon buffer prepared: %s", output_vector_path)
 
+    @handle_errors
     def road_buffer(self) -> None:
         """
         Add unique IDs to road edges and generate buffer polygons around them.
@@ -69,6 +96,7 @@ class ProcessVectors:
         result.to_file(output_vector_path, driver="GPKG")
         logger.info("Road buffer prepared: %s", output_vector_path)
 
+    @handle_errors
     def clip_roads(self) -> None:
         """
         Clip road buffer polygons using tree buffer polygons.
@@ -84,6 +112,7 @@ class ProcessVectors:
         clipping_vectors(input_vector, mask_vector, output_vector_path)
         logger.info("Road buffers clipped: %s", output_vector_path)
 
+    @handle_errors
     def calculate_areas(self) -> None:
         """
         Compute road buffer and tree overlay areas, and calculate greendex metrics.
