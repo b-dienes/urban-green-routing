@@ -1,8 +1,9 @@
-# Urban Green Routing
+## Urban Green Routing
 
 **Urban Green Routing** is a tree-optimized walking routing tool that computes routes favoring streets with higher tree coverage, based on NAIP satellite imagery, tree canopy segmentation, and OpenStreetMap street networks.
+
 ---
-## **Background & Motivation**
+## Background & Motivation
 
 Urban walkability is strongly influenced by greenery. Trees improve the pedestrian experience, reduce heat, and increase overall well-being. Urban Green Routing is designed as a GIS engineering project to quantify greenery along streets and compute routes that maximize tree coverage while remaining practical for walking.
 
@@ -13,16 +14,16 @@ The user provides configuration for three main components:
 
 **Area of Interest (AOI)**
 
-- Name and bounding box (southwest and northeast coordinates) defining the area where routing is performed.
+- Name and bounding box (southwest and northeast coordinates) defining the area where routing is performed
 
 **Imagery Resolution**
 
-- Defines the spatial resolution for NAIP satellite imagery. Higher resolution improves tree detection detail, which affects route optimization.
+- Defines the spatial resolution for NAIP satellite imagery. Higher resolution improves tree detection detail, which affects route optimization
 
 **Routing Options**
 
-- Shortest: prioritize minimal distance.
-- Greenest: favor streets with higher tree coverage.
+- Shortest: prioritize minimal distance
+- Greenest: favor streets with higher tree coverage
 
 ---
 
@@ -30,13 +31,13 @@ The user provides configuration for three main components:
 
 1. **Data Acquisition**
 
-- Download NAIP satellite imagery for the AOI.
-- Extract street network from OpenStreetMap for the same AOI using OSMnx.
+- Download NAIP satellite imagery for the AOI
+- Extract street network from OpenStreetMap for the same AOI using OSMnx
   
 2. **Tree Detection**  
 
-- Segment trees from NAIP satellite imagery using Detectree.
-- Raster processing, reprojection, and vectorization using NumPy, Rasterio, and Shapely.
+- Segment trees from NAIP satellite imagery using Detectree
+- Raster processing, reprojection, and vectorization using NumPy, Rasterio, and Shapely
 
 3. **Vector & Geometry Processing**
 
@@ -54,6 +55,8 @@ The user provides configuration for three main components:
 ---
 
 ## **Architecture / Project Structure**
+
+```text
 data/
 ├── raw/          # files from each processing step
 ├── processed/    # output routes
@@ -73,6 +76,7 @@ src/
 ├── reproject_layers.py
 ├── green_routing.py
 └── main.py
+```
 
 ---
 
@@ -129,6 +133,7 @@ The map should illustrate:
 - **Tree Detector (Detectree):** fully implemented
 - **Routing Module:** fully implemented
 - **Data Handling & Utilities:** fully implemented
+- **Processing Pipeline:** fully implemented
 - **Code Structure:** clear separation of responsibilities; scripts are concise and maintainable
 - **Unit Testing:** planned for all modules (including error cases)
 - **main.py:** upcoming module to orchestrate all pipeline steps in a single execution
