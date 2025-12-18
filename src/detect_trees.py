@@ -28,8 +28,16 @@ class DetectTrees:
     def load_classifier(self) -> None:
         """
         Load pre-trained Detectree classifier and store it in self.clf.
+
+        Raises:
+            RuntimeError: If the classifier fails to load.
         """
-        clf = dtr.Classifier()
+        try:
+            clf = dtr.Classifier()
+        except RuntimeError as e:
+            logger.error("Failed to load Detectree classifier: %s", e)
+            raise
+
         self.clf = clf
         logger.info("Detectree classifier loaded for AOI: %s", self.user_input.aoi_name)
 
@@ -39,23 +47,47 @@ class DetectTrees:
 
         The classifier returns a NumPy array of 0/1 values. This method converts it
         to an 8-bit visualization mask (0 → 0, 1 → 255).
+
+        Raises:
+            ValueError: If the input raster has invalid data or shape.
+            MemoryError: If the image is too large to process.
         """
-        mask_array = self.clf.predict_img(self.input_tif)
-        mask_vis = (mask_array * 255).astype(np.uint8)
+        try:
+            mask_array = self.clf.predict_img(self.input_tif)
+            mask_vis = (mask_array * 255).astype(np.uint8)
+        except ValueError as e:
+            logger.error("Invalid raster data: %s", e)
+            raise
+        except MemoryError as e:
+             logger.error("Not enough memory to process raster: %s", e)
+             raise
+
         self.mask_vis = mask_vis
         logger.info("Tree mask predicted")
 
     def mask_saver(self) -> None:
         """
         Save the predicted mask as a single-band uint8 TIFF.
+
+        Raises:
+            rasterio.errors.RasterioIOError: If the input TIFF file cannot be read by rasterio.
+            PermissionError: If the output file cannot be written due to insufficient permissions.
         """
         output_path = self.raw_folder / f"{self.user_input.aoi_name}_tree_mask.tif"
 
-        with rasterio.open(self.input_tif) as src:
-            meta = src.meta.copy()
-            meta.update(dtype=rasterio.uint8, count=1)
-        with rasterio.open(output_path, 'w', **meta) as dst:
-            dst.write(self.mask_vis, 1)
+        try:
+            with rasterio.open(self.input_tif) as src:
+                meta = src.meta.copy()
+                meta.update(dtype=rasterio.uint8, count=1)
+            with rasterio.open(output_path, 'w', **meta) as dst:
+                dst.write(self.mask_vis, 1)
+        except rasterio.errors.RasterioIOError as e:
+            logger.error("Cannot read NAIP satellite image: %s", e)
+            raise
+        except PermissionError:
+            logger.error("No permission to write tree mask raster: %s", output_path)
+            raise
+
         logger.info("Tree mask raster saved to %s", output_path)
 
     def tree_detector(self) -> None:
