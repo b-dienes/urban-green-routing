@@ -1,9 +1,10 @@
-## Urban Green Routing
+# Urban Green Routing
 
-**Urban Green Routing** is a tree-optimized walking routing tool that computes routes favoring streets with higher tree coverage, based on NAIP satellite imagery, tree canopy segmentation, and OpenStreetMap street networks.
+Urban Green Routing is a tree-optimized walking routing tool that computes routes favoring streets with higher tree coverage, based on NAIP satellite imagery, tree canopy segmentation, and OpenStreetMap street networks.
 
 ---
-## Background & Motivation
+
+## **Background & Motivation**
 
 Urban walkability is strongly influenced by greenery. Trees improve the pedestrian experience, reduce heat, and increase overall well-being. Urban Green Routing is designed as a GIS engineering project to quantify greenery along streets and compute routes that maximize tree coverage while remaining practical for walking.
 
