@@ -33,6 +33,12 @@ class DownloadNaip:
     def naip_request(self) -> None:
         """
         Send a request to the NAIP ImageServer to download imagery for the specified bounding box.
+
+        Raises:
+            requests.exceptions.Timeout: If the server does not respond within the timeout.
+            requests.exceptions.RequestException: For other network-related errors.
+            ValueError: If the downloaded content is empty.
+
         """
         
         logger.info("NAIP download started")
@@ -53,20 +59,39 @@ class DownloadNaip:
         "f": "image",
         "dpi":96}
 
-        response = requests.get(url, params=params)
+        try:
+            response = requests.get(url, params=params, timeout=60)
+            response.raise_for_status()
+        except requests.exceptions.Timeout:
+            logger.error("NAIP download timed out. Check internet connection or AOI size")
+            raise
+        except requests.exceptions.RequestException as e:
+            logger.error(f"NAIP download failed due to network error: {e}")
+            raise
+        if not response.content:
+            raise ValueError("NAIP download content is empty, Check your AOI")
+            
         self.response_content = response.content
+        logger.info("NAIP downloader finished")
 
     def naip_save(self) -> None:
         """
         Save the downloaded NAIP image to the raw data folder.
+
+        Raises:
+            PermissionError: If the output file cannot be written due to insufficient permissions.
         """
         aoi_name = self.user_input.aoi_name
         output_path = self.raw_folder / f"{aoi_name}.tif"
 
-        with open(output_path, 'wb') as f:
-                f.write(self.response_content)
+        try:
+            with open(output_path, 'wb') as f:
+                    f.write(self.response_content)
+        except PermissionError:
+            logger.error("No permission to write NAIP image to %s", output_path)
+            raise
 
-        logger.info("NAIP download finished")
+        logger.info("NAIP image saved to %s", output_path)
         
     def naip_downloader(self) -> None:
         """
