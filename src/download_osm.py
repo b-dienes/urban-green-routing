@@ -29,28 +29,59 @@ class DownloadOsm:
     def osm_request(self) -> None:
         """
         Retrieve the OSM graph for the bounding box and store it in response_content.
+
+        Raises:
+            ValueError: If the downloaded graph is empty.
+            RuntimeError: For network or OSM data retrieval errors.
         """
-        G = ox.graph_from_bbox(self.bbox_osm, network_type="walk", simplify=False)
+        try:
+            G = ox.graph_from_bbox(self.bbox_osm, network_type="walk", simplify=False)
+        except Exception as e:
+            logger.error(f"OSM download failed due to network or server error: {e}")
+            raise
+
+        if len(G.nodes) == 0 or len(G.edges) == 0:
+            raise ValueError("Downloaded OSM graph is empty. Check AOI")
+
         logger.info("OSM graph retrieved: %dnodes, %dedges", len(G.nodes), len(G.edges))
         self.response_content = G
 
     def osm_save(self) -> None:
         """
         Save the downloaded graph as a GraphML file.
+
+        Raises:
+            PermissionError: If the output file cannot be written due to insufficient permissions.
         """
         output_path = self.raw_folder / f"{self.user_input.aoi_name}_graph.graphml"
-        ox.save_graphml(self.response_content, output_path)
+
+        try:
+            ox.save_graphml(self.response_content, output_path)
+        except PermissionError:
+            logger.error("No permission to write OSM graph to %s", output_path)
+            raise
+
+        logger.info("OSM graph saved to %s", output_path)
 
     def osm_gpkg_save(self) -> None:
         """
         Save graph nodes and edges as GeoPackages.
+
+        Raises:
+            PermissionError: If the output file cannot be written due to insufficient permissions.        
         """
         output_path_nodes = self.raw_folder / f"{self.user_input.aoi_name}_nodes.gpkg"
         output_path_edges = self.raw_folder / f"{self.user_input.aoi_name}_edges.gpkg"
 
         nodes, edges = ox.graph_to_gdfs(self.response_content)
-        nodes.to_file(output_path_nodes, driver="GPKG")
-        edges.to_file(output_path_edges, driver="GPKG")
+
+        try:
+            nodes.to_file(output_path_nodes, driver="GPKG")
+            edges.to_file(output_path_edges, driver="GPKG")
+        except PermissionError:
+            logger.error("No permission to write OSM GeoPackages to %s and %s", output_path_nodes, output_path_edges,)
+            raise
+
         logger.info("%s_nodes.gpkg and %s_edges.gpkg saved", self.user_input.aoi_name, self.user_input.aoi_name)
 
     def osm_visualize(self) -> None:
