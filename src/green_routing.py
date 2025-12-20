@@ -29,14 +29,19 @@ class GreenRouting:
         """
         Build a directed graph from node and edge files in raw_folder.
         
-        Side effects:
-            Sets self.graph (nx.DiGraph) and self.edges (GeoDataFrame)
+        Raises:
+            ValueError: If nodes or edges files are empty.
         """
         nodes_path = self.raw_folder / f"{self.user_input.aoi_name}_nodes.gpkg"
         edges_path = self.raw_folder / f"{self.user_input.aoi_name}_edges_greendex.gpkg"
 
         nodes = gpd.read_file(nodes_path)
         edges = gpd.read_file(edges_path)
+
+        if nodes.empty:
+            raise ValueError("Nodes file is empty. Cannot build routing graph.")
+        if edges.empty:
+            raise ValueError("Edges file is empty. Cannot build routing graph.")
 
         G = nx.DiGraph()
         for idx, row in nodes.iterrows():
@@ -54,31 +59,41 @@ class GreenRouting:
 
     def create_route(self) -> None:
         """
-            Compute the shortest path as a list of nodes from routing source to target 
-            using the routing weight.
+        Compute the shortest path as a list of nodes from routing source to target 
+        using the routing weight.
 
-            Note:
-                This path includes nodes only; corresponding edges are filtered and 
-                processed later in subsequent methods.
+        Note:
+            This path includes nodes only; corresponding edges are filtered and 
+            processed later in subsequent methods.
 
-            Side effects:
-                Sets self.path (list of node IDs)
+        Raises:
+            networkx.NodeNotFound: If source or target node is not in the graph.
+            networkx.NetworkXNoPath: If no path exists between source and target.
         """
-        path = nx.shortest_path(
-            self.graph,
-            source=self.user_input.routing_source,
-            target=self.user_input.routing_target,
-            weight=self.user_input.routing_weight.value)
+        try:
+            path = nx.shortest_path(
+                self.graph,
+                source=self.user_input.routing_source,
+                target=self.user_input.routing_target,
+                weight=self.user_input.routing_weight.value)
+        except nx.NodeNotFound:
+            logger.error("Routing source or target not found in graph. Check the IDs provided: Source: %s Target: %s", self.user_input.routing_source, self.user_input.routing_target)
+            raise
+        except nx.NetworkXNoPath:
+            logger.error("No routing path exists between source and target. Check the IDs provided: Source: %s Target: %s", self.user_input.routing_source, self.user_input.routing_target)
+            raise
         self.path = path
         logger.info("Route nodes selected based on field: %s", self.user_input.routing_weight.value)
 
     def create_edgepairs(self) -> None:
         """
-        Build a list of ordered edge pairs from the nodes from self.path.
+        Build a list of ordered edge pairs (from u to v) from the nodes from self.path.
         
-        Side effects:
-            Sets self.edge_pairs (list of tuples)
+        Raise:
+            ValueError: If the resulting path is too short to create edges (has 0 or 1 node only).
         """
+        if len(self.path) < 2:
+            raise ValueError("Computed route is too short to create edges")
         edge_pairs = list(zip(self.path[:-1], self.path[1:]))
         self.edge_pairs = edge_pairs
         logger.info("Edgepairs created")
@@ -86,13 +101,15 @@ class GreenRouting:
     def retrieve_edges(self) -> None:
         """
         Retrieve the edges in order along the path from self.edge_pairs.
-        
-        Side effects:
-            Sets self.ordered_edges (list of edge rows)
+
+        Raises:
+            ValueError: If an edge for a path segment cannot be found.
         """
         ordered_edges = []
         for u, v in self.edge_pairs:
             match = self.edges[(self.edges["u"] == u) & (self.edges["v"] == v)]
+            if match.empty:
+                raise ValueError(f"No edge found for path segment u={u}, v={v}")
             ordered_edges.append(match.iloc[0])
         self.ordered_edges = ordered_edges
         logger.info("Edges along path selected")
@@ -100,9 +117,6 @@ class GreenRouting:
     def convert_edges(self) -> None:
         """
         Convert the ordered edges to a GeoDataFrame.
-        
-        Side effects:
-            Sets self.route_edges_gdf (GeoDataFrame)
         """
         route_edges_gdf = gpd.GeoDataFrame(self.ordered_edges, crs=self.edges.crs)
         self.route_edges_gdf = route_edges_gdf
@@ -111,9 +125,6 @@ class GreenRouting:
     def merge_edges(self) -> None:
         """
         Merge the geometries of the route edges into a single LineString.
-        
-        Side effects:
-            Sets self.route_line (LineString)
         """
         route_line = linemerge(self.route_edges_gdf.geometry.tolist())
         self.route_line = route_line
@@ -123,8 +134,8 @@ class GreenRouting:
         """
         Save the route as a GeoPackage file in raw_folder.
         
-        Side effects:
-            Writes a GeoPackage file at self.raw_folder
+        Raises:
+            PermissionError: If the output file cannot be written.
         """
         output_route_path = self.processed_folder / f"{self.user_input.aoi_name}_route_{self.user_input.routing_weight.value}.gpkg"
 
@@ -136,7 +147,11 @@ class GreenRouting:
             geometry=[self.route_line],
             crs=self.edges.crs
         )
-        route_gdf.to_file(output_route_path, driver="GPKG")
+        try:
+            route_gdf.to_file(output_route_path, driver="GPKG")
+        except PermissionError:
+            logger.error("No permission to write route GPKG to %s", output_route_path)
+            raise
         logger.info("Route saved as %s: ", output_route_path)
 
     def run_routing(self) -> None:
