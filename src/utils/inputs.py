@@ -33,6 +33,27 @@ class UserInput:
     routing_target: int | None = None
     routing_weight: RoutingPreference = RoutingPreference.GREENEST
 
+    def __post_init__(self):
+        """Validate input values immediately after object creation."""
+        # Check for missing/None critical fields
+        critical_fields = [self.aoi_name, self.sw_lat, self.sw_lon, self.ne_lat, self.ne_lon, self.resolution]
+        if any(field is None for field in critical_fields):
+            raise ValueError("Missing required user input fields")
+
+        # Degenerate bbox (SW == NE)
+        if self.sw_lat == self.ne_lat or self.sw_lon == self.ne_lon:
+            raise ValueError("Degenerate bounding box: SW and NE cannot be equal")
+
+        # Check that SW < NE
+        if self.sw_lon >= self.ne_lon or self.sw_lat >= self.ne_lat:
+            raise ValueError("SW coordinates must be smaller than NE coordinates")
+                
+        # Limit coordinates to valid ranges (extreme coordinates)
+        if not (-90 <= self.sw_lat <= 90 and -90 <= self.ne_lat <= 90):
+            raise ValueError("Latitude must be between -90 and 90")
+        if not (-180 <= self.sw_lon <= 180 and -180 <= self.ne_lon <= 180):
+            raise ValueError("Longitude must be between -180 and 180")
+
 def user_input() -> UserInput:
     """
     Build and return the UserInput configuration for the routing workflow.
