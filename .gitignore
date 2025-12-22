@@ -24,3 +24,6 @@ cache/
 # AUX files
 *.aux
 *.aux.xml
+
+#Pytest-cov coverage
+.coverage
