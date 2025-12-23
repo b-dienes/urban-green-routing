@@ -76,6 +76,16 @@ def tile_calculator(bbox_mercator: BoundingBoxMercator, resolution: float) -> tu
     width  = int(round((xmax - xmin) / resolution))
     height = int(round((ymax - ymin) / resolution))
 
+    if width < 1 or height < 1:
+        raise ValueError(
+            f"Width and height (pixel count) must be >= 1. "
+            f"Width: {width}, height: {height}")
+
+    if width >2500 or height > 2500:
+        raise ValueError(
+            f"Tile size too large: maximum allowed is 2500x2500 pixels. "
+            f"Width: {width}, height: {height}")
+
     logger.info("Width: %d", width)
     logger.info("Height: %d", height) 
 
