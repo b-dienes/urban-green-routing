@@ -54,6 +54,10 @@ class UserInput:
         if not (-180 <= self.sw_lon <= 180 and -180 <= self.ne_lon <= 180):
             raise ValueError("Longitude must be between -180 and 180")
 
+        # Resolution must not be smaller than 0.6
+        if self.resolution < 0.6:
+            raise ValueError("Finest possible resolution is 0.6m for NAIP satellite imagery") 
+
 def user_input() -> UserInput:
     """
     Build and return the UserInput configuration for the routing workflow.
