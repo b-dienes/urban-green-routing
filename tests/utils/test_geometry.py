@@ -74,34 +74,61 @@ def test_bounding_box_mercator_extreme_coordinates():
     for val in [bbox_mercator.xmin, bbox_mercator.ymin, bbox_mercator.xmax, bbox_mercator.ymax]:
         assert val != float("inf")
 
-def test_tile_calculator_basic():
-    '''
-    ----------------------------------------
-    Function: tile_calculator(bbox_mercator, resolution)
-    ----------------------------------------
-    # Normal cases
-    # - Typical bbox and resolution -> check width and height
-    # - Large bbox with reasonable resolution
+def test_tile_calculator_normal_bbox():
+    """
+    Typical bounding box and resolution.
 
-    # Edge cases
-    # - Zero resolution -> should raise ZeroDivisionError
-    # - Negative resolution -> optional, decide expected behavior
-    # - Very small bbox (width or height < 1 pixel) -> output should round correctly
-    # - Very large bbox -> output should not overflow integer
-    '''
-
+    Verify:
+    - Returned width and height are integers
+    - Width and height are computed correctly from bbox size and resolution
+    """
     bbox_mercator = BoundingBoxMercator(
         xmin = 0,
         ymin = 0,
-        xmax = 0,
-        ymax = 0)
-    resolution = 10
+        xmax = 10,
+        ymax = 10)
+    resolution = 1
 
     width, height = tile_calculator(bbox_mercator, resolution)
 
+    assert isinstance(width, int)
+    assert isinstance(height, int)
 
-#bounding_box_osm
-#reproject_raster_layer
+    assert width == 10
+    assert height == 10
+
+
+@pytest.mark.parametrize(
+    "xmax, ymax, expected_msg",
+        [
+            (0.1,0.1,"Width and height (pixel count) must be >= 1. Width: 0, height: 0"),
+            (10000,10000, "Tile size too large: maximum allowed is 2500x2500 pixels. Width: 10000, height: 10000")
+        ]
+)
+def test_tile_calculator_invalid_bbox_size(xmax, ymax, expected_msg):
+    """
+    Invalid bounding box sizes resulting in unusable tile dimensions.
+
+    Verify:
+    - A ValueError is raised when the resulting width or height is < 1 pixel
+    - A ValueError is raised when the resulting width or height exceeds the maximum allowed size (2500*2500 pixels)
+    - The error message matches the expected, user-facing message
+    - Resolution constraints (minimum 0.6m for NAIP imagery) are validated upstream and are not tested here
+    """
+    bbox_mercator = BoundingBoxMercator(
+            xmin = 0,
+            ymin = 0,
+            xmax = xmax,
+            ymax = ymax)
+
+    resolution = 1
+
+    with pytest.raises(ValueError) as exc_info:
+        tile_calculator(bbox_mercator, resolution)
+
+    assert str(exc_info.value) == expected_msg
+
+
 
 """
 ----------------------------------------
