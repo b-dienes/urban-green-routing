@@ -1,6 +1,6 @@
 import pytest
 from utils.inputs import UserInput, RoutingPreference
-from utils.geometry import BoundingBoxMercator, bounding_box_mercator, tile_calculator
+from utils.geometry import BoundingBoxMercator, bounding_box_mercator, tile_calculator, bounding_box_osm
 
 """
 Tests for utils.geometry
@@ -128,26 +128,77 @@ def test_tile_calculator_invalid_bbox_size(xmax, ymax, expected_msg):
 
     assert str(exc_info.value) == expected_msg
 
+def test_bounding_box_osm_normal_coordinates():
+    """
+    Normal bounding box coordinates converted to an OSM-compatible tuple.
+
+    Verify:
+    - The returned object is a tuple
+    - All values are floats
+    - The ordering is correct: (xmin, ymin, xmax, ymax)
+    - Typical SW < NE coordinates are handled correctly
+    """
+    user_input = UserInput(
+        aoi_name = "test_aoi",
+        sw_lat = 0,
+        sw_lon = 0,
+        ne_lat = 1,
+        ne_lon = 1,
+        resolution = 1,
+        routing_source = 1,
+        routing_target = 2,
+        routing_weight = RoutingPreference.SHORTEST)
+
+    bbox_osm = bounding_box_osm(user_input)
+
+    assert isinstance(bbox_osm, tuple)
+
+    for val in bbox_osm:
+        assert isinstance(val, float)
+    
+    assert bbox_osm == (user_input.sw_lon, user_input.sw_lat, user_input.ne_lon, user_input.ne_lat)
+
+def test_bounding_box_osm_extreme_coordinates():
+    """
+    Extreme bounding box coordinates converted to an OSM-compatible tuple.
+
+    Verify:
+    - The returned object is a tuple
+    - xmin < xmax, ymin < ymax
+    - No value is infinite
+    - Works with coordinates near valid extremes (-85 to 85 latitude, -179 to 179 longitude)
+    """
+    user_input = UserInput(
+        aoi_name = "test_aoi",
+        sw_lat = -85,
+        sw_lon = -179,
+        ne_lat = 85,
+        ne_lon = 179,
+        resolution = 1,
+        routing_source = 1,
+        routing_target = 2,
+        routing_weight = RoutingPreference.SHORTEST)
+
+    bbox_osm = bounding_box_osm(user_input)
+
+    assert isinstance(bbox_osm, tuple)
+
+    assert bbox_osm[0] < bbox_osm[2]
+    assert bbox_osm[1] < bbox_osm[3]
+
+    for val in bbox_osm:
+        assert val != float("inf")
+        assert isinstance(val, float)
 
 
-"""
-----------------------------------------
-Function: bounding_box_osm(user_input)
-----------------------------------------
-# Normal cases
-# - Typical coordinates -> output tuple (xmin, ymin, xmax, ymax)
-# - Verify ordering: left, bottom, right, top
 
-# Edge cases
-# - Degenerate bbox (SW == NE)
-# - SW > NE coordinates
 
-# Error cases
-# - Missing or None values -> should raise AttributeError
 
-----------------------------------------
-Function: reproject_raster_layer(dst_crs, input_raster, output_raster)
-----------------------------------------
+#Function: reproject_raster_layer(dst_crs, input_raster, output_raster)
+# dst_crs e.g. 'EPSG:5070'
+# input raster: path to a tif file
+# output path: path to a tif file
+
 # Normal cases
 # - Small dummy raster -> output raster created
 # - Verify CRS, width, height
@@ -160,6 +211,8 @@ Function: reproject_raster_layer(dst_crs, input_raster, output_raster)
 # - input_raster path does not exist -> FileNotFoundError
 # - output path permission denied -> PermissionError
 
+
+"""
 ----------------------------------------
 Function: reproject_vector_layer(dst_crs, input_vector, output_vector)
 ----------------------------------------
