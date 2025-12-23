@@ -108,7 +108,7 @@ def bounding_box_osm(user_input: UserInput) -> tuple[float, float, float, float]
     xmax = user_input.ne_lon
     ymax = user_input.ne_lat
 
-    bbox_osm = (xmin, ymin, xmax, ymax)
+    bbox_osm = (float(xmin), float(ymin), float(xmax), float(ymax))
     logger.info("OSM bounding box (WGS84): West: %s, South: %s, East: %s, North: %s", xmin, ymin, xmax, ymax)
     return bbox_osm
 
