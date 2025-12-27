@@ -1,6 +1,17 @@
 import pytest
+from unittest.mock import patch
+import os
+import geopandas as gpd
+import numpy as np
+import rasterio
+from rasterio.transform import from_origin
 from utils.inputs import UserInput, RoutingPreference
-from utils.geometry import BoundingBoxMercator, bounding_box_mercator, tile_calculator, bounding_box_osm
+from utils.geometry import (
+    BoundingBoxMercator,
+    bounding_box_mercator,
+    tile_calculator,
+    bounding_box_osm,
+    reproject_raster_layer)
 
 """
 Tests for utils.geometry
@@ -190,26 +201,86 @@ def test_bounding_box_osm_extreme_coordinates():
         assert val != float("inf")
         assert isinstance(val, float)
 
+@pytest.fixture
+def simple_raster(tmp_path):
+    """
+    Create a simple 1-band 10x10 raster with EPSG:4326 CRS for testing.
 
+    Returns:
+        Path: Path to the created raster file.
+    """
+    raster_path = tmp_path / "input.tif"
 
+    data = np.ones((1, 10, 10), dtype=np.uint8)
+    transform = from_origin(0, 10, 1, 1)  # top left corner is at: x=0,y=10, pixel size=1
 
+    with rasterio.open(
+        raster_path,
+        "w",
+        driver="GTiff",
+        height=10,
+        width=10,
+        count=1,
+        dtype=data.dtype,
+        crs="EPSG:4326",
+        transform=transform,
+    ) as dst:
+        dst.write(data)
 
-#Function: reproject_raster_layer(dst_crs, input_raster, output_raster)
-# dst_crs e.g. 'EPSG:5070'
-# input raster: path to a tif file
-# output path: path to a tif file
+    return raster_path
 
-# Normal cases
-# - Small dummy raster -> output raster created
-# - Verify CRS, width, height
+def test_reproject_raster_layer_creates_output(simple_raster, tmp_path):
+    """
+    Reproject a valid single-band raster to a target CRS and write the result to disk.
 
-# Edge cases
-# - Empty raster -> should not crash
-# - Unsupported CRS string -> should raise an error
+    Verify:
+    - The output raster file is created
+    - The output raster CRS matches the requested target CRS
+    - The output raster has valid, non-zero dimensions
+    - The number of bands is preserved from the input raster
+    """
+    dst_crs = 'EPSG:5070'
+    output_raster = tmp_path / "output.tif"
 
-# Error cases
-# - input_raster path does not exist -> FileNotFoundError
-# - output path permission denied -> PermissionError
+    reproject_raster_layer(dst_crs, simple_raster, output_raster)
+
+    assert output_raster.exists()
+
+    with rasterio.open(output_raster) as dst:
+        assert dst.crs.to_string() == dst_crs
+        assert dst.width > 0
+        assert dst.height > 0
+        assert dst.count == 1 #1band
+
+def test_reproject_raster_layer_missing_input(tmp_path):
+    """
+    Verify that reprojecting a raster with a missing input path raises a RasterioIOError.
+    """
+    input_raster = tmp_path / "missing.tif"
+    output_raster = tmp_path / "output.tif"
+
+    with pytest.raises(rasterio.errors.RasterioIOError):
+        reproject_raster_layer('EPSG:5070', input_raster, output_raster)
+
+def test_reproject_raster_layer_invalid_crs(simple_raster, tmp_path):
+    """
+    Verify that reprojecting a raster with an invalid CRS string
+    raises an error (ValueError or CRSError depending on rasterio version).
+    """
+    output_raster = tmp_path / "output.tif"
+
+    with pytest.raises((rasterio.errors.CRSError, ValueError)):
+        reproject_raster_layer('EPSG:INVALID', simple_raster, output_raster)
+
+def test_reproject_raster_layer_permission_denied(simple_raster, tmp_path):
+    """
+    Verify that attempting to write to a location with simulated permission denial raises a RasterioIOError.
+    """
+    output_raster = tmp_path / "no_write"
+
+    with patch("rasterio.open", side_effect=rasterio.errors.RasterioIOError("Permission denied")):
+        with pytest.raises(rasterio.errors.RasterioIOError):
+            reproject_raster_layer('EPSG:5070', simple_raster, output_raster)
 
 
 """
