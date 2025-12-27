@@ -1,7 +1,9 @@
 import pytest
 from unittest.mock import patch
-import os
 import geopandas as gpd
+import pyogrio
+from shapely.geometry import Polygon
+from pyproj import CRS
 import numpy as np
 import rasterio
 from rasterio.transform import from_origin
@@ -11,7 +13,9 @@ from utils.geometry import (
     bounding_box_mercator,
     tile_calculator,
     bounding_box_osm,
-    reproject_raster_layer)
+    reproject_raster_layer,
+    reproject_vector_layer)
+
 
 """
 Tests for utils.geometry
@@ -282,23 +286,97 @@ def test_reproject_raster_layer_permission_denied(simple_raster, tmp_path):
         with pytest.raises(rasterio.errors.RasterioIOError):
             reproject_raster_layer('EPSG:5070', simple_raster, output_raster)
 
+@pytest.fixture
+def simple_gdf():
+    gdf = gpd.GeoDataFrame({
+        "geometry": [Polygon([(0,0),(1,0),(1,1),(0,1)])]},
+        geometry="geometry",
+        crs="EPSG:4326")
+    return gdf
+
+@pytest.fixture
+def empty_gdf():
+    gdf = gpd.GeoDataFrame({
+        "geometry": []},
+        geometry="geometry",
+        crs="EPSG:4326")
+    return gdf
+
+def test_reproject_vector_layer_creates_output(simple_gdf, tmp_path):
+    """
+    Reproject a small, valid GeoDataFrame to a target CRS and write the result to a GeoPackage.
+
+    Verify:
+    - The output vector file is created
+    - The output vector CRS matches the requested target CRS
+    """
+    dst_crs = "EPSG:5070"
+    input_vector = tmp_path / "input.gpkg"
+    output_vector = tmp_path / "output.gpkg"
+
+    simple_gdf.to_file(input_vector, driver="GPKG")
+
+    reproject_vector_layer(dst_crs, input_vector, output_vector)
+
+    assert output_vector.exists()
+
+    out_gdf = gpd.read_file(output_vector)
+    assert out_gdf.crs == CRS.from_user_input(dst_crs)
+
+def test_reproject_vector_layer_allows_empty_vector(empty_gdf, tmp_path):
+    """
+    Reproject an empty GeoDataFrame to a target CRS and write the result to a GeoPackage.
+
+    Verify:
+    - The output vector file is created
+    - The output vector contains zero features
+    - The output vector CRS matches the requested target CRS
+    """
+    dst_crs = "EPSG:5070"
+    input_vector = tmp_path / "input.gpkg"
+    output_vector = tmp_path / "output.gpkg"
+
+    empty_gdf.to_file(input_vector, driver="GPKG")
+
+    reproject_vector_layer(dst_crs, input_vector, output_vector)
+
+    out_gdf = gpd.read_file(output_vector)
+
+    assert output_vector.exists()
+    assert len(out_gdf) == 0
+    assert out_gdf.crs == CRS.from_user_input(dst_crs)
+
+def test_reproject_vector_layer_missing_input(tmp_path):
+    """
+    Attempt to reproject a vector file from a path that does not exist.
+
+    Verify:
+    - The function raises an appropriate exception (DataSourceError or ValueError)
+    """
+    input_vector = tmp_path / "missing.gpkg"
+    output_vector = tmp_path / "output.gpkg"
+
+    with pytest.raises((pyogrio.errors.DataSourceError, ValueError)):
+        reproject_vector_layer('EPSG:5070', input_vector, output_vector)
+
+def test_reproject_vector_layer_permission_denied(simple_gdf, tmp_path):
+    """
+    Attempt to reproject a valid GeoDataFrame to an output location with simulated write permission denial.
+
+    Verify:
+    - The function raises a PermissionError when writing the output file fails
+    """
+    input_vector = tmp_path / "input.gpkg"
+    output_vector = tmp_path / "output.gpkg"
+
+    simple_gdf.to_file(input_vector, driver="GPKG")
+
+    with patch("geopandas.GeoDataFrame.to_file", side_effect=PermissionError("Permission denied")):
+        with pytest.raises(PermissionError):
+            reproject_vector_layer('EPSG:5070', input_vector, output_vector)
+
 
 """
-----------------------------------------
-Function: reproject_vector_layer(dst_crs, input_vector, output_vector)
-----------------------------------------
-# Normal cases
-# - Small GeoDataFrame -> output file created
-# - Verify CRS of output
-
-# Edge cases
-# - Empty GeoDataFrame
-# - Invalid CRS string
-
-# Error cases
-# - input_vector path does not exist -> FileNotFoundError
-# - output_vector path permission denied -> PermissionError
-
 ----------------------------------------
 Function: raster_to_vector(input_raster_path, output_vector_path)
 ----------------------------------------
