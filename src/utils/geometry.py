@@ -172,6 +172,9 @@ def raster_to_vector(input_raster_path: Path, output_vector_path: Path) -> None:
         input_raster_path (Path): Path to the input raster mask file.
         output_vector_path (Path): Path where the output vector file will be saved.
 
+    Raises:
+        ValueError: If no foreground pixels (value=255) are found in the input raster.
+
     Returns:
         None
     """
@@ -181,7 +184,10 @@ def raster_to_vector(input_raster_path: Path, output_vector_path: Path) -> None:
             if value == 255:
                 features.append({
                     "geometry": shape(geom), "value": value})
-    
+
+        if not features:
+            raise ValueError("No foreground pixels (value=255) found in raster")
+
         gdf = gpd.GeoDataFrame(features, crs=src.crs)
         gdf.to_file(output_vector_path, driver="GPKG")
 
