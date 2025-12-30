@@ -253,9 +253,29 @@ def clipping_vectors(input_vector: gpd.GeoDataFrame, mask_vector: gpd.GeoDataFra
         mask_vector (GeoDataFrame): GeoDataFrame used as the clipping mask.
         output_vector_path (Path): Path where the clipped vector file will be saved.
 
+    Raises:
+        ValueError: If the input and mask GeoDataFrames have different CRS.
+        ValueError: If the input or mask GeoDataFrame contains null geometries.
+        ValueError: If the input or mask GeoDataFrame contains invalid geometries.
+
     Returns:
         None
     """
+    if input_vector.crs != mask_vector.crs:
+        raise ValueError("Input and mask CRS must match")
+
+    if not input_vector.geometry.notnull().all():
+        raise ValueError("Input contains null geometries")
+
+    if not mask_vector.geometry.notnull().all():
+        raise ValueError("Mask contains null geometries")
+
+    if not input_vector.geometry.is_valid.all():
+        raise ValueError("Input contains invalid geometries")
+
+    if not mask_vector.geometry.is_valid.all():
+        raise ValueError("Mask contains invalid geometries")
+
     clipped = gpd.clip(input_vector, mask_vector, keep_geom_type=False, sort=False)
     clipped.to_file(output_vector_path, driver="GPKG")
 
