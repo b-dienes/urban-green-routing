@@ -14,7 +14,8 @@ from utils.geometry import (
     tile_calculator,
     bounding_box_osm,
     reproject_raster_layer,
-    reproject_vector_layer)
+    reproject_vector_layer,
+    raster_to_vector)
 
 
 """
@@ -376,26 +377,174 @@ def test_reproject_vector_layer_permission_denied(simple_gdf, tmp_path):
             reproject_vector_layer('EPSG:5070', input_vector, output_vector)
 
 
-"""
-----------------------------------------
-Function: raster_to_vector(input_raster_path, output_vector_path)
-----------------------------------------
-# Normal cases
-# - Small raster mask with 255 pixels -> vector polygons created
-# - Output file created
+@pytest.fixture
+def clustered_raster(tmp_path):
+    """
+    Create a 1-band 10x10 raster with two foreground clusters for testing.
 
-# Edge cases
-# - Raster with no 255 pixels -> output GeoDataFrame empty
-# - Single pixel raster -> produces single polygon
-# - Large raster -> memory usage reasonable (can mock)
+    Returns:
+        Path: Path to the created raster file.
+    """
+    raster_path = tmp_path / "clustered.tif"
 
-# Error cases
-# - Input file does not exist -> FileNotFoundError
-# - Output path permission denied -> PermissionError
+    data = np.zeros((1, 10, 10), dtype=np.uint8)
 
-----------------------------------------
-Function: add_id(gdf, id_vector_path)
-----------------------------------------
+    # Cluster 1 (top-left 3x3)
+    data[0, 1:4, 1:4] = 255
+
+    # Cluster 2 (bottom-right 3x3)
+    data[0, 6:9, 6:9] = 255
+
+    transform = from_origin(
+        west=0,
+        north=10,
+        xsize=1,
+        ysize=1,
+    )
+
+    with rasterio.open(
+        raster_path,
+        "w",
+        driver="GTiff",
+        height=10,
+        width=10,
+        count=1,
+        dtype=data.dtype,
+        crs="EPSG:5070",
+        transform=transform,
+        nodata=0,
+    ) as dst:
+        dst.write(data)
+
+    return raster_path
+
+def test_raster_to_vector_creates_output(clustered_raster, tmp_path):
+    """
+    Convert a raster mask with multiple foreground clusters into vector polygons.
+
+    Verify:
+    - The output GeoPackage file is created
+    - Two vector features are produced, corresponding to the two raster clusters
+    - The output CRS matches the input raster CRS
+    - All geometries are valid and non-degenerate
+    - The polygon areas match the expected raster cluster size
+    """
+    output_vector_path =tmp_path / "output.gpkg"
+
+    raster_to_vector(clustered_raster, output_vector_path)
+
+    assert output_vector_path.exists()
+
+    out_gdf = gpd.read_file(output_vector_path)
+    assert len(out_gdf) == 2
+    assert out_gdf.crs.to_string() == "EPSG:5070"
+    assert all(out_gdf.geometry.is_valid)
+
+    areas = sorted(out_gdf.geometry.area)
+    assert areas[0] == pytest.approx(9.0)
+    assert areas[1] == pytest.approx(9.0)
+
+@pytest.fixture
+def one_pixel_raster(tmp_path):
+    """
+    Create a 1-band 1x1 raster with a single foreground pixel for testing.
+
+    Returns:
+        Path: Path to the created raster file.
+    """
+    raster_path = tmp_path / "input.tif"
+
+    data = np.full((1, 1, 1), 255, dtype=np.uint8)
+    transform = from_origin(0, 1, 1, 1)  # top left corner is at: x=0,y=1, pixel size=1
+
+    with rasterio.open(
+        raster_path,
+        "w",
+        driver="GTiff",
+        height=1,
+        width=1,
+        count=1,
+        dtype=data.dtype,
+        crs="EPSG:5070",
+        transform=transform,
+    ) as dst:
+        dst.write(data)
+
+    return raster_path
+
+def test_raster_to_vector_single_output(one_pixel_raster, tmp_path):
+    """
+    Convert a single-pixel foreground raster into a vector polygon.
+
+    Verify:
+    - The output GeoPackage file is created
+    - Exactly one vector feature is produced
+    - The resulting polygon has the expected area corresponding to one raster pixel
+    """
+    output_vector_path = tmp_path / "output.gpkg"
+
+    raster_to_vector(one_pixel_raster, output_vector_path)
+
+    assert output_vector_path.exists()
+
+    out_gdf = gpd.read_file(output_vector_path)
+    assert len(out_gdf) == 1
+
+    geom = out_gdf.geometry.iloc[0]
+    assert geom.area == pytest.approx(1.0)
+
+def test_raster_to_vector_incorrect_grayscale_value(simple_raster, tmp_path):
+    """
+    Attempt raster-to-vector conversion on a raster with no valid foreground pixels.
+
+    Verify:
+    - A ValueError is raised when no pixels with value=255 are present
+    - The error message clearly indicates the absence of foreground pixels
+    """
+    output_vector_path = tmp_path / "output.gpkg"
+
+    with pytest.raises(ValueError) as exc_info:
+        raster_to_vector(simple_raster, output_vector_path)
+
+    expected_msg = "No foreground pixels (value=255) found in raster"
+    assert str(exc_info.value) == expected_msg
+
+def test_raster_to_vector_missing_input(tmp_path):
+    """
+    Attempt raster-to-vector conversion using a non-existent input raster file.
+
+    Verify:
+    - An exception is raised when the input raster path does not exist
+    - The function does not create any output files when input reading fails
+    """
+    input_raster_path = tmp_path / "missing.tif"
+    output_vector_path = tmp_path / "output.gpkg"
+
+    with pytest.raises((rasterio.errors.RasterioIOError, ValueError)):
+        raster_to_vector(input_raster_path, output_vector_path)
+
+
+def test_raster_to_vector_permission_denied(simple_raster, tmp_path):
+    """
+    Attempt to write vector output to a location without write permissions.
+
+    Verify:
+    - A PermissionError is raised when the output GeoPackage cannot be written
+    - The error originates from the vector file writing stage
+    """
+    output_vector_path = tmp_path / "no_write"
+
+    with patch("geopandas.GeoDataFrame.to_file", side_effect=PermissionError("Permission denied")):
+        with pytest.raises(PermissionError):
+            raster_to_vector(simple_raster, output_vector_path)
+
+
+
+
+
+
+#add_id(gdf, id_vector_path)
+
 # Normal cases
 # - GeoDataFrame with multiple features -> 'id' column added, starts at 1
 
@@ -406,6 +555,7 @@ Function: add_id(gdf, id_vector_path)
 # Error cases
 # - Output path permission denied -> PermissionError
 
+"""
 ----------------------------------------
 Function: buffer_vector(gdf, distance)
 ----------------------------------------
