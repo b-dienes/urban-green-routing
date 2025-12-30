@@ -15,7 +15,9 @@ from utils.geometry import (
     bounding_box_osm,
     reproject_raster_layer,
     reproject_vector_layer,
-    raster_to_vector)
+    raster_to_vector,
+    add_id,
+    buffer_vector)
 
 
 """
@@ -524,7 +526,7 @@ def test_raster_to_vector_missing_input(tmp_path):
         raster_to_vector(input_raster_path, output_vector_path)
 
 
-def test_raster_to_vector_permission_denied(simple_raster, tmp_path):
+def test_raster_to_vector_permission_denied(one_pixel_raster, tmp_path):
     """
     Attempt to write vector output to a location without write permissions.
 
@@ -536,41 +538,182 @@ def test_raster_to_vector_permission_denied(simple_raster, tmp_path):
 
     with patch("geopandas.GeoDataFrame.to_file", side_effect=PermissionError("Permission denied")):
         with pytest.raises(PermissionError):
-            raster_to_vector(simple_raster, output_vector_path)
+            raster_to_vector(one_pixel_raster, output_vector_path)
+
+@pytest.fixture
+def complex_gdf():
+    gdf = gpd.GeoDataFrame({
+        "geometry": [
+            Polygon([(0,0),(1,0),(1,1),(0,1)]),
+            Polygon([(3,3),(4,0),(4,4),(0,4)]),
+            Polygon([(5,5),(6,0),(6,6),(0,6)])]},
+        geometry="geometry",
+        crs="EPSG:5070")
+    return gdf
+
+def test_add_id_adds_id(complex_gdf, tmp_path):
+    """
+    Add a unique integer ID column to a GeoDataFrame and verify the result.
+
+    Verify:
+    - The output GeoPackage file is created
+    - The number of features is unchanged
+    - The 'id' column exists and contains sequential integers starting at 1
+    """
+    id_vector_path = tmp_path / "output.gpkg"
+
+    add_id(complex_gdf, id_vector_path)
+
+    assert id_vector_path.exists()
+
+    out_gdf = gpd.read_file(id_vector_path)
+    assert len(out_gdf) == len(complex_gdf)
+
+    assert "id" in out_gdf.columns
+
+    expected_ids = list(range(1,len(complex_gdf)+1))
+    assert out_gdf['id'].tolist() == expected_ids
+
+def test_add_id_empty_vector(empty_gdf, tmp_path):
+    """
+    Add a unique integer ID column to an empty GeoDataFrame.
+
+    Verify:
+    - The output GeoPackage file is created
+    - The resulting GeoDataFrame has zero rows
+    - The 'id' column exists even if empty
+    """
+    id_vector_path = tmp_path / "output.gpkg"
+
+    add_id(empty_gdf, id_vector_path)
+
+    assert id_vector_path.exists()
+
+    out_gdf = gpd.read_file(id_vector_path)
+    assert len(out_gdf) == 0
+    assert "id" in out_gdf.columns
+
+def test_add_id_existing_id_field(complex_gdf, tmp_path):
+    """
+    Add a unique integer ID column to a GeoDataFrame that already has an 'id' column.
+
+    Verify:
+    - The output GeoPackage file is created
+    - The number of features is unchanged
+    - The 'id' column is overwritten with sequential integers starting at 1
+    """
+    id_vector_path = tmp_path / "output.gpkg"
+
+    gdf_with_id = complex_gdf.copy()
+    gdf_with_id['id'] = range(len(gdf_with_id), 0, -1)
+
+    add_id(gdf_with_id, id_vector_path)
+
+    assert id_vector_path.exists()
+
+    out_gdf = gpd.read_file(id_vector_path)
+    assert len(out_gdf) == len(gdf_with_id)
+
+    expected_ids = list(range(1,len(complex_gdf)+1))
+    assert out_gdf['id'].tolist() == expected_ids
+
+def test_add_id_permission_denied(simple_gdf, tmp_path):
+    """
+    Attempt to write a GeoDataFrame to a location without write permissions.
+
+    Raises:
+        PermissionError: If the output file cannot be written due to insufficient permissions.
+    """
+    id_vector_path = tmp_path / "no_write"
+
+    with patch("geopandas.GeoDataFrame.to_file", side_effect=PermissionError("Permission denied")):
+        with pytest.raises(PermissionError):
+            add_id(simple_gdf, id_vector_path)
+
+def test_buffer_vector_creates_buffer(simple_gdf):
+    """
+    Create a buffer around a valid polygon geometry.
+
+    Verify:
+    - A GeoDataFrame is returned
+    - The number of features remains unchanged
+    - All output geometries are valid
+    - The buffered geometries have a larger area than the original geometries
+    """
+    distance = 1
+
+    out_gdf = buffer_vector(simple_gdf, distance)
+
+    assert out_gdf is not None
+    assert len(out_gdf) == len(simple_gdf)
+    assert all(out_gdf.geometry.is_valid)
+    assert all(out_gdf.geometry.area > simple_gdf.geometry.area)
+
+def test_buffer_vector_empty_buffer(empty_gdf):
+    """
+    Apply buffering to an empty GeoDataFrame.
+
+    Verify:
+    - A GeoDataFrame is returned
+    - The output GeoDataFrame contains no features
+    """
+    distance = 1
+
+    out_gdf = buffer_vector(empty_gdf, distance)
+
+    assert out_gdf is not None
+    assert len(out_gdf) == 0
+
+def test_buffer_vector_invalid_distance(simple_gdf):
+    """
+    Attempt to create a buffer using a non-positive distance.
+
+    Raises:
+        ValueError: If the buffer distance is zero or negative.
+    """
+    distance = 0
+
+    with pytest.raises(ValueError) as exc_info:
+        buffer_vector(simple_gdf, distance)
+
+    expected_msg = "Invalid buffer distance"
+    assert str(exc_info.value) == expected_msg
+
+def test_buffer_vector_invalid_geometry():
+    """
+    Attempt to buffer a GeoDataFrame containing invalid geometries.
+
+    Raises:
+        ValueError: If the input GeoDataFrame contains geometries that are not valid.
+    """
+    poly = Polygon([(0,0),(1,1),(1,0),(0,1),(0,0)])
+    invalid_gdf = gpd.GeoDataFrame({"geometry": [poly]}, geometry="geometry")
+
+    with pytest.raises(ValueError) as exc_info:
+        buffer_vector(invalid_gdf, 1)
+
+    expected_msg = "Input contains invalid geometries"
+    assert str(exc_info.value) == expected_msg
+
+def test_buffer_vector_none_geometry():
+    """
+    Attempt to buffer a GeoDataFrame containing null geometries.
+
+    Raises:
+        ValueError: If the input GeoDataFrame contains null geometry values.
+    """
+    gdf = gpd.GeoDataFrame({"geometry": [None]}, geometry="geometry")
+
+    with pytest.raises(ValueError) as exc_info:
+        buffer_vector(gdf, 1)
+
+    expected_msg = "Input contains null geometries"
+    assert str(exc_info.value) == expected_msg
 
 
 
-
-
-
-#add_id(gdf, id_vector_path)
-
-# Normal cases
-# - GeoDataFrame with multiple features -> 'id' column added, starts at 1
-
-# Edge cases
-# - Empty GeoDataFrame -> 'id' column added (empty)
-# - Existing 'id' column -> should overwrite or handle gracefully
-
-# Error cases
-# - Output path permission denied -> PermissionError
 
 """
-----------------------------------------
-Function: buffer_vector(gdf, distance)
-----------------------------------------
-# Normal cases
-# - Typical polygon -> buffered correctly
-# - Line or point geometries -> buffered correctly
-
-# Edge cases
-# - Distance = 0 -> geometries unchanged
-# - Negative distance -> optional behavior
-# - Empty GeoDataFrame
-
-# Error cases
-# - Invalid geometry types -> should raise error
-
 ----------------------------------------
 Function: clipping_vectors(input_vector, mask_vector, output_vector_path)
 ----------------------------------------
