@@ -210,14 +210,36 @@ def add_id(gdf: gpd.GeoDataFrame, id_vector_path: Path) -> gpd.GeoDataFrame:
 def buffer_vector(gdf: gpd.GeoDataFrame, distance: float) -> gpd.GeoDataFrame:
     """
     Create buffer geometries around input vector features.
+    Notes:
+        The buffer distance is interpreted in the units of the GeoDataFrame's CRS.
+        A projected (metric) CRS is recommended for meaningful buffer distances,
+        but the operation will still execute for geographic CRSs (e.g. EPSG:4326)
+        without raising an error.
 
     Parameters:
         gdf (GeoDataFrame): Input GeoDataFrame containing geometries to buffer.
         distance (float): Buffer distance in CRS units.
 
+    Raises:
+        ValueError: If the buffer distance is zero or negative.
+        ValueError: If the input GeoDataFrame contains null geometries.
+        ValueError: If the input GeoDataFrame contains invalid geometries.
+
     Returns:
         GeoDataFrame: GeoDataFrame with buffered geometries.
     """
+    if distance <= 0:
+        raise ValueError("Invalid buffer distance")
+    
+    if gdf.empty:
+        return gdf.copy()
+
+    if not gdf.geometry.notnull().all():
+        raise ValueError("Input contains null geometries")
+
+    if not gdf.geometry.is_valid.all():
+        raise ValueError("Input contains invalid geometries")
+
     buffered = gdf.copy()
     buffered.geometry = buffered.geometry.buffer(distance)
     return buffered
