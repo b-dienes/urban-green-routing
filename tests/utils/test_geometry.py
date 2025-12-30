@@ -17,7 +17,8 @@ from utils.geometry import (
     reproject_vector_layer,
     raster_to_vector,
     add_id,
-    buffer_vector)
+    buffer_vector,
+    clipping_vectors)
 
 
 """
@@ -710,25 +711,169 @@ def test_buffer_vector_none_geometry():
     expected_msg = "Input contains null geometries"
     assert str(exc_info.value) == expected_msg
 
+@pytest.fixture
+def mask_gdf():
+    gdf = gpd.GeoDataFrame({
+        "geometry": [Polygon([(0.5,0),(1.5,0),(1.5,1),(0.5,1)])]},
+        geometry="geometry",
+        crs="EPSG:4326")
+    return gdf
 
+@pytest.fixture
+def mask_gdf_epsg_5070():
+    gdf = gpd.GeoDataFrame({
+        "geometry": [Polygon([(0.5,0),(1.5,0),(1.5,1),(0.5,1)])]},
+        geometry="geometry",
+        crs="EPSG:5070")
+    return gdf
+
+
+@pytest.fixture
+def invalid_gdf():
+    gdf = gpd.GeoDataFrame({
+        "geometry": [Polygon([(0,0),(1,1),(1,0),(0,1),(0,0)])]},
+        geometry="geometry",
+        crs="EPSG:4326")
+    return gdf
+
+@pytest.fixture
+def none_gdf():
+    gdf = gpd.GeoDataFrame({
+        "geometry": [None]},
+        geometry="geometry",
+        crs="EPSG:4326")
+    return gdf
+
+def test_clipping_vectors_creates_clip(simple_gdf, mask_gdf, tmp_path):
+    """
+    Clip a simple input polygon using a mask polygon and write the result to disk.
+
+    Verify:
+    - The output vector file is created
+    - The output CRS matches the input CRS
+    - The resulting geometry is valid
+    - The clipped geometry has the expected area
+    """
+    output_vector_path = tmp_path / "output.gpkg"
+
+    clipping_vectors(simple_gdf, mask_gdf, output_vector_path)
+
+    assert output_vector_path.exists()
+
+    out_gdf = gpd.read_file(output_vector_path)
+    assert out_gdf.crs == simple_gdf.crs
+    assert all(out_gdf.geometry.is_valid)
+    assert pytest.approx(out_gdf.area.iloc[0]) == simple_gdf.area.iloc[0] * 0.5
+
+def test_clipping_vectors_crs_mismatch(simple_gdf, mask_gdf_epsg_5070, tmp_path):
+    """
+    Attempt to clip vectors with mismatching coordinate reference systems.
+
+    Raises:
+        ValueError: If the input and mask GeoDataFrames have different CRS.
+    """
+    output_vector_path = tmp_path / "output.gpkg"
+
+    with pytest.raises(ValueError) as exc_info:
+        clipping_vectors(simple_gdf, mask_gdf_epsg_5070, output_vector_path)
+
+    expected_msg = "Input and mask CRS must match"
+    assert str(exc_info.value) == expected_msg
+
+def test_clipping_vectors_empty_input(simple_gdf, empty_gdf, tmp_path):
+    """
+    Clip a valid input GeoDataFrame using an empty mask.
+
+    Verify:
+    - The output vector file is created
+    - The resulting GeoDataFrame is empty
+    """
+    output_vector_path = tmp_path / "output.gpkg"
+
+    clipping_vectors(simple_gdf, empty_gdf, output_vector_path)
+
+    assert output_vector_path.exists()
+
+    out_gdf = gpd.read_file(output_vector_path)
+    assert out_gdf is not None
+    assert len(out_gdf) == 0
+
+def test_clipping_vectors_invalid_input_geometry(invalid_gdf, simple_gdf, tmp_path):
+    """
+    Attempt to clip vectors when the input GeoDataFrame contains invalid geometries.
+
+    Raises:
+        ValueError: If the input GeoDataFrame contains invalid geometries.
+    """
+    output_vector_path = tmp_path / "output.gpkg"
+
+    with pytest.raises(ValueError) as exc_info:
+        clipping_vectors(invalid_gdf, simple_gdf, output_vector_path)
+
+    expected_msg = "Input contains invalid geometries"
+    assert str(exc_info.value) == expected_msg
+
+def test_clipping_vectors_invalid_mask_geometry(simple_gdf, invalid_gdf, tmp_path):
+    """
+    Attempt to clip vectors when the mask GeoDataFrame contains invalid geometries.
+
+    Raises:
+        ValueError: If the mask GeoDataFrame contains invalid geometries.
+    """
+    output_vector_path = tmp_path / "output.gpkg"
+
+    with pytest.raises(ValueError) as exc_info:
+        clipping_vectors(simple_gdf, invalid_gdf, output_vector_path)
+
+    expected_msg = "Mask contains invalid geometries"
+    assert str(exc_info.value) == expected_msg
+
+def test_clipping_vectors_none_input_geometry(simple_gdf, none_gdf, tmp_path):
+    """
+    Attempt to clip vectors when the input GeoDataFrame contains null geometries.
+
+    Raises:
+        ValueError: If the input GeoDataFrame contains null geometries.
+    """
+    output_vector_path = tmp_path / "output.gpkg"
+
+    with pytest.raises(ValueError) as exc_info:
+        clipping_vectors(none_gdf, simple_gdf, output_vector_path)
+
+    expected_msg = "Input contains null geometries"
+    assert str(exc_info.value) == expected_msg
+
+def test_clipping_vectors_none_mask_geometry(simple_gdf, none_gdf, tmp_path):
+    """
+    Attempt to clip vectors when the mask GeoDataFrame contains null geometries.
+
+    Raises:
+        ValueError: If the mask GeoDataFrame contains null geometries.
+    """
+    output_vector_path = tmp_path / "output.gpkg"
+
+    with pytest.raises(ValueError) as exc_info:
+        clipping_vectors(simple_gdf, none_gdf, output_vector_path)
+
+    expected_msg = "Mask contains null geometries"
+    assert str(exc_info.value) == expected_msg
+
+def test_clipping_vectors_permission_denied(simple_gdf, mask_gdf, tmp_path):
+    """
+    Attempt to write clipped vector output to a location without write permissions.
+
+    Verify:
+    - A PermissionError is raised when the output GeoPackage cannot be written
+    - The error originates from the vector file writing stage
+    """
+    output_vector_path = tmp_path / "no_write"
+
+    with patch("geopandas.GeoDataFrame.to_file", side_effect=PermissionError("Permission denied")):
+        with pytest.raises(PermissionError):
+            clipping_vectors(simple_gdf, mask_gdf, output_vector_path)
 
 
 """
-----------------------------------------
-Function: clipping_vectors(input_vector, mask_vector, output_vector_path)
-----------------------------------------
-# Normal cases
-# - Input polygon clipped by mask -> output matches expected
-# - Output file created
-
-# Edge cases
-# - Input or mask empty -> output empty
-# - No overlap between input and mask -> output empty
-# - Partial overlap -> check geometry
-
-# Error cases
-# - Output path permission denied -> PermissionError
-
 ----------------------------------------
 Function: calculate_area(gdf)
 ----------------------------------------
