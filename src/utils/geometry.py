@@ -289,9 +289,19 @@ def calculate_area(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     Parameters:
         gdf (GeoDataFrame): Input GeoDataFrame with polygon geometries.
 
+    Raises:
+        ValueError: If the input GeoDataFrame contains null geometries.
+        ValueError: If the input GeoDataFrame contains invalid geometries.
+
     Returns:
         GeoDataFrame: GeoDataFrame with an added 'area' column.
     """
+    if not gdf.geometry.notnull().all():
+        raise ValueError("Input contains null geometries")
+
+    if not gdf.geometry.is_valid.all():
+        raise ValueError("Input contains invalid geometries")
+
     aread = gdf.copy()
     aread['area'] = aread.geometry.area
     aread['area'] = aread['area'].fillna(0)
@@ -305,9 +315,19 @@ def join_by_attribute(gdf: gpd.GeoDataFrame, join: gpd.GeoDataFrame) -> gpd.GeoD
         gdf (GeoDataFrame): Target GeoDataFrame.
         join (GeoDataFrame): GeoDataFrame containing 'id' and 'area' columns.
 
+    Raises:
+        ValueError: If the input GeoDataFrame is missing the 'id' column.
+        ValueError: If the join GeoDataFrame is missing the 'id' column.
+
     Returns:
         GeoDataFrame: GeoDataFrame with joined area attributes.
     """
+    if 'id' not in gdf.columns:
+        raise ValueError("ID field is missing in input layer: add 'id'")
+
+    if 'id' not in join.columns:
+        raise ValueError("ID field is missing in join layer: add 'id'")
+
     joined = gdf.merge(join[['id','area']], on='id', how='left')
     return joined
 
