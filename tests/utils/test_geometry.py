@@ -18,7 +18,9 @@ from utils.geometry import (
     raster_to_vector,
     add_id,
     buffer_vector,
-    clipping_vectors)
+    clipping_vectors,
+    calculate_area,
+    join_by_attribute)
 
 
 """
@@ -873,36 +875,196 @@ def test_clipping_vectors_permission_denied(simple_gdf, mask_gdf, tmp_path):
             clipping_vectors(simple_gdf, mask_gdf, output_vector_path)
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def test_calculate_area_creates_output(simple_gdf):
+    """
+    Verify that calculate_area correctly adds an 'area' column for a valid polygon GeoDataFrame.
+
+    Verifiy:
+    - The output GeoDataFrame retains valid geometries.
+    - An 'area' column is added to the output, but the original GeoDataFrame is unchanged.
+    - The computed area matches the polygon's geometric area.
+    """
+    out_gdf = calculate_area(simple_gdf)
+    assert all(out_gdf.geometry.is_valid)
+    assert "area" in out_gdf.columns
+    assert "area" not in simple_gdf.columns
+    assert out_gdf['area'].values == pytest.approx(simple_gdf.geometry.area.values)
+
+def test_calculate_area_empty_input(empty_gdf):
+    """
+    Verify that calculate_area handles an empty GeoDataFrame gracefully.
+
+    Checks:
+    - The output GeoDataFrame retains the 'geometry' column and is still valid.
+    - An 'area' column is added.
+    - The output remains empty, with no rows.
+    """
+    out_gdf = calculate_area(empty_gdf)
+    assert all(out_gdf.geometry.is_valid)
+    assert "area" in out_gdf.columns
+    assert out_gdf.empty
+
+def test_calculate_area_none_input(none_gdf):
+    """
+    Attempt to calculate area when the input GeoDataFrame contains null geometries.
+
+    Raises:
+        ValueError: If any geometry in the input GeoDataFrame is null.
+    """
+    with pytest.raises(ValueError) as exc_info:
+        calculate_area(none_gdf)
+
+    expected_msg = "Input contains null geometries"
+    assert str(exc_info.value) == expected_msg
+
+def test_calculate_area_invalid_input(invalid_gdf):
+    """
+    Attempt to calculate area when the input GeoDataFrame contains invalid geometries.
+
+    Raises:
+        ValueError: If any geometry in the input GeoDataFrame is invalid.
+    """
+    with pytest.raises(ValueError) as exc_info:
+            calculate_area(invalid_gdf)
+
+    expected_msg = "Input contains invalid geometries"
+    assert str(exc_info.value) == expected_msg
+
+
+@pytest.fixture
+def empty_geometry_gdf():
+    gdf = gpd.GeoDataFrame({
+        "geometry": [Polygon()]},
+        geometry="geometry",
+        crs="EPSG:4326")
+    return gdf
+
+def test_calculate_area_empty_geometry_input(empty_geometry_gdf):
+    """
+    Verify that calculate_area correctly handles a GeoDataFrame with an empty polygon geometry.
+
+    Checks:
+    - The output geometry remains valid.
+    - An 'area' column is added.
+    - The area of the empty polygon is set to 0, ensuring no NaN values remain.
+    """
+    out_gdf = calculate_area(empty_geometry_gdf)
+    assert all(out_gdf.geometry.is_valid)
+    assert "area" in out_gdf.columns
+    assert out_gdf["area"].iloc[0] == 0
+
+def test_join_by_attribute_creates_output(simple_gdf, mask_gdf):
+    """
+    Verify that join_by_attribute merges area values from another GeoDataFrame
+    based on matching IDs.
+
+    Checks:
+    - The output GeoDataFrame retains valid geometries.
+    - The output has correct columns after merging.
+    - The IDs in the original and joined GeoDataFrames match.
+    - Area values from the join GeoDataFrame are correctly attached.
+    - No rows are lost in the left join.
+    """
+    simple_gdf['id'] = 1
+    simple_gdf['area'] = 1
+    mask_gdf['id'] = 1
+    mask_gdf['area'] = 1
+
+    out_gdf = join_by_attribute(simple_gdf, mask_gdf)
+    assert all(out_gdf.geometry.is_valid)
+    assert len(out_gdf) == len(simple_gdf)
+
+    assert "area_x" in out_gdf.columns
+    assert "area_y" in out_gdf.columns
+    assert "id" in out_gdf.columns
+    assert (out_gdf['id'] == simple_gdf['id']).all()
+    assert (out_gdf['area_x'] == simple_gdf['area']).all()
+    assert (out_gdf['area_y'] == mask_gdf['area']).all()
+    assert not out_gdf['area_y'].isna().any()
+
+def test_join_by_attribute_non_matching_ids(simple_gdf, mask_gdf):
+    """
+    Verify that join_by_attribute handles the case when no IDs match between GeoDataFrames.
+
+    Checks:
+    - The output GeoDataFrame retains valid geometries.
+    - The row count remains the same as the left GeoDataFrame.
+    - The joined 'area' column contains NaN values for non-matching IDs.
+    - Original IDs are preserved in the output.
+    """
+    simple_gdf['id'] = 1
+    simple_gdf['area'] = 1
+    mask_gdf['id'] = 2
+    mask_gdf['area'] = 1
+
+    out_gdf = join_by_attribute(simple_gdf, mask_gdf)
+    assert all(out_gdf.geometry.is_valid)
+    assert len(out_gdf) == len(simple_gdf)
+    assert 'area_y' in out_gdf.columns
+    assert out_gdf['area_y'].isna().all()
+    assert (out_gdf['area_x'] == simple_gdf['area']).all()
+    assert (out_gdf['id'] == simple_gdf['id']).all()
+
+def test_join_by_attribute_missing_inputlayer_id(simple_gdf, mask_gdf):
+    """
+    Verify that join_by_attribute raises a ValueError when the input GeoDataFrame
+    does not contain an 'id' column.
+
+    Raises:
+        ValueError: If the input GeoDataFrame is missing the 'id' column.
+    """
+    mask_gdf['id'] = 1
+    simple_gdf['area'] = 1
+    mask_gdf['area'] = 1
+
+    with pytest.raises(ValueError) as exc_info:
+            join_by_attribute(simple_gdf, mask_gdf)
+
+    expected_msg = "ID field is missing in input layer: add 'id'"
+    assert str(exc_info.value) == expected_msg
+
+def test_join_by_attribute_missing_joinlayer_id(simple_gdf, mask_gdf):
+    """
+    Verify that join_by_attribute raises a ValueError when the join GeoDataFrame
+    does not contain an 'id' column.
+
+    Raises:
+        ValueError: If the join GeoDataFrame is missing the 'id' column.
+    """
+    simple_gdf['id'] = 1
+    simple_gdf['area'] = 1
+    mask_gdf['area'] = 1
+
+    with pytest.raises(ValueError) as exc_info:
+        join_by_attribute(simple_gdf, mask_gdf)
+
+    expected_msg = "ID field is missing in join layer: add 'id'"
+    assert str(exc_info.value) == expected_msg
+
+
+
 """
-----------------------------------------
-Function: calculate_area(gdf)
-----------------------------------------
-# Normal cases
-# - Polygon geometries -> 'area' column added, positive values
-# - Multipolygons -> areas sum correctly
-
-# Edge cases
-# - Empty GeoDataFrame -> 'area' column added (empty)
-# - Degenerate polygons -> area = 0
-# - Polygons with invalid geometries -> handled or fixed
-
-# Error cases
-# - Non-polygon geometries -> should raise error or skip
-
-----------------------------------------
-Function: join_by_attribute(gdf, join)
-----------------------------------------
-# Normal cases
-# - Matching IDs -> area values merged
-# - Non-matching IDs -> NaN or filled value
-
-# Edge cases
-# - Empty gdf or join -> returns empty or unchanged
-# - Duplicate IDs in join -> behavior defined (merge strategy)
-
-# Error cases
-# - Missing 'id' column -> KeyError
-
 ----------------------------------------
 Function: calculate_greendex(gdf)
 ----------------------------------------
