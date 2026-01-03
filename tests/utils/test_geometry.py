@@ -20,7 +20,8 @@ from utils.geometry import (
     buffer_vector,
     clipping_vectors,
     calculate_area,
-    join_by_attribute)
+    join_by_attribute,
+    calculate_greendex)
 
 
 """
@@ -874,28 +875,6 @@ def test_clipping_vectors_permission_denied(simple_gdf, mask_gdf, tmp_path):
         with pytest.raises(PermissionError):
             clipping_vectors(simple_gdf, mask_gdf, output_vector_path)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def test_calculate_area_creates_output(simple_gdf):
     """
     Verify that calculate_area correctly adds an 'area' column for a valid polygon GeoDataFrame.
@@ -1062,22 +1041,154 @@ def test_join_by_attribute_missing_joinlayer_id(simple_gdf, mask_gdf):
     expected_msg = "ID field is missing in join layer: add 'id'"
     assert str(exc_info.value) == expected_msg
 
+def test_calculate_greendex_creates_output(complex_gdf):
+    """
+    Verify that calculate_greendex correctly computes greendex and weight for normal inputs.
 
+    Checks:
+    - 'greendex' and 'weight' columns are added to the output GeoDataFrame.
+    - greendex is calculated as area_y / area_x and rounded to 4 decimals.
+    - weight is calculated as normalized length multiplied by inverted greendex.
+    - Row count of the output matches the input GeoDataFrame.
+    """
+    complex_gdf['area_x'] = [100,100,100]
+    complex_gdf['area_y'] = [20,10,50]
+    complex_gdf['length'] = [10, 20, 30]
+    expected_greendex = [0.2, 0.1, 0.5]
+    expected_weight = [0.0*0.8, 0.5*0.9, 1.0*0.5]
 
-"""
-----------------------------------------
-Function: calculate_greendex(gdf)
-----------------------------------------
-# Normal cases
-# - Normal area_x, area_y values -> greendex and weight calculated
-# - Length normalization correct
+    out_gdf = calculate_greendex(complex_gdf.copy())
 
-# Edge cases
-# - area_x = 0 -> greendex = 0
-# - area_y > area_x -> greendex > 1 -> capped or handled
-# - length min == max -> division by zero
+    assert len(out_gdf) == len(complex_gdf)
 
-# Error cases
-# - Missing columns -> KeyError
-# - Empty GeoDataFrame
-"""
+    assert 'greendex' in out_gdf.columns
+    assert 'weight' in out_gdf.columns    
+
+    assert out_gdf['greendex'].values == pytest.approx(expected_greendex)
+    assert out_gdf['weight'].values == pytest.approx(expected_weight)
+
+def test_calculate_greendex_returns_zero_when_area_x_is_zero(simple_gdf):
+    """
+    Verify that calculate_greendex handles area_x = 0 without errors.
+
+    Checks:
+    - greendex is set to 0 when area_x is 0 to avoid division by zero.
+    - Function returns a valid GeoDataFrame.
+    """
+    simple_gdf['area_x'] = [0]
+    simple_gdf['area_y'] = [1]
+    simple_gdf['length'] = [1]
+
+    out_gdf = calculate_greendex(simple_gdf.copy())
+
+    assert out_gdf.loc[0, 'greendex'] == pytest.approx(0.0)
+
+def test_calculate_greendex_is_capped(simple_gdf):
+    """
+    Verify that calculate_greendex caps greendex at 1 when area_y exceeds area_x.
+
+    Checks:
+    - greendex does not exceed 1 even if area_y > area_x.
+    - Function returns a valid GeoDataFrame with expected values.
+    """
+    simple_gdf['area_x'] = [1]
+    simple_gdf['area_y'] = [2]
+    simple_gdf['length'] = [1]
+
+    out_gdf = calculate_greendex(simple_gdf.copy())
+
+    assert out_gdf.loc[0, 'greendex'] == pytest.approx(1.0)
+
+def test_calculate_greendex_missing_area_values(complex_gdf):
+    """
+    Verify that calculate_greendex handles missing area values (NaN) correctly.
+
+    Checks:
+    - NaN values in area_x or area_y are replaced with 0 in greendex.
+    - weight is calculated based on filled greendex values.
+    - Row count of the output matches the input GeoDataFrame.
+    """
+    complex_gdf['area_x'] = [100,None,100]
+    complex_gdf['area_y'] = [20,10,None]
+    complex_gdf['length'] = [10, 20, 30]
+    expected_greendex = [0.2, 0, 0]
+    expected_weight = [0.0*0.8, 0.5*1.0, 1.0*1.0]
+
+    out_gdf = calculate_greendex(complex_gdf.copy())
+
+    assert len(out_gdf) == len(complex_gdf)
+
+    assert out_gdf['greendex'].values == pytest.approx(expected_greendex)
+    assert out_gdf['weight'].values == pytest.approx(expected_weight)
+
+def test_calculate_greendex_equal_lengths(complex_gdf):
+    """
+    Verify that calculate_greendex correctly handles the case when all segment lengths are equal.
+
+    Checks:
+    - length normalization fallback sets length_norm to 1.0 for all rows.
+    - greendex and weight are computed correctly using the fallback length normalization.
+    - Row count of the output matches the input GeoDataFrame.
+    """
+    complex_gdf['area_x'] = [100,100,100]
+    complex_gdf['area_y'] = [20,10,50]
+    complex_gdf['length'] = [10, 10, 10]
+    expected_greendex = [0.2, 0.1, 0.5]
+    expected_weight = [1.0*0.8, 1.0*0.9, 1.0*0.5]
+
+    out_gdf = calculate_greendex(complex_gdf.copy())
+
+    assert len(out_gdf) == len(complex_gdf)
+
+    assert out_gdf['greendex'].values == pytest.approx(expected_greendex)
+    assert out_gdf['weight'].values == pytest.approx(expected_weight)
+
+def test_calculate_greendex_empty_input(empty_gdf):
+    """
+    Verify that calculate_greendex handles an empty GeoDataFrame without errors.
+
+    Checks:
+    - 'greendex' and 'weight' columns are added to the empty GeoDataFrame.
+    - The output GeoDataFrame remains empty.
+    """
+    empty_gdf['area_x'] = []
+    empty_gdf['area_y'] = []
+    empty_gdf['length'] = []
+
+    out_gdf = calculate_greendex(empty_gdf.copy())
+
+    assert 'greendex' in out_gdf.columns
+    assert 'weight' in out_gdf.columns
+    assert out_gdf.empty
+
+def test_calculate_greendex_area_x_missing(simple_gdf):
+    """
+    Verify that calculate_greendex raises a ValueError when the 'area_x' column is missing.
+
+    Raises:
+        ValueError: If the input GeoDataFrame is missing the 'area_x' column.
+    """
+    simple_gdf['area_y'] = [1]
+    simple_gdf['length'] = [1]
+
+    with pytest.raises(ValueError) as exc_info:
+        calculate_greendex(simple_gdf.copy())
+
+    expected_msg = "Road segment buffer area field (area_x) missing"
+    assert str(exc_info.value) == expected_msg
+
+def test_calculate_greendex_area_y_missing(simple_gdf):
+    """
+    Verify that calculate_greendex raises a ValueError when the 'area_y' column is missing.
+
+    Raises:
+        ValueError: If the input GeoDataFrame is missing the 'area_y' column.
+    """
+    simple_gdf['area_x'] = [1]
+    simple_gdf['length'] = [1]
+
+    with pytest.raises(ValueError) as exc_info:
+        calculate_greendex(simple_gdf.copy())
+
+    expected_msg = "Tree buffer clip area field (area_y) missing"
+    assert str(exc_info.value) == expected_msg
