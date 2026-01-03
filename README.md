@@ -136,6 +136,5 @@ The map should illustrate:
 - **Data Handling & Utilities:** fully implemented
 - **Processing Pipeline:** fully implemented
 - **Code Structure:** clear separation of responsibilities; scripts are concise and maintainable
-- **Unit Testing:** planned for all modules (including error cases)
-- **main.py:** upcoming module to orchestrate all pipeline steps in a single execution
+- **Unit Testing:** full coverage for geometry.py (GIS core module; most relevant for spatial operations), total coverage 30%
 - **Limitations:** processing time can be significant; tree detection quality varies
