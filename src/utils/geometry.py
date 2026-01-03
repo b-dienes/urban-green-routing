@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pyproj import Transformer
 from utils.inputs import user_input, UserInput
 import geopandas as gpd
+import numpy as np
 import rasterio
 from rasterio.features import shapes
 from shapely.geometry import shape
@@ -348,14 +349,28 @@ def calculate_greendex(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     Parameters:
         gdf (GeoDataFrame): GeoDataFrame containing area and length attributes.
 
+    Raises:
+        ValueError: If the input GeoDataFrame is missing the 'area_x' column.
+        ValueError: If the input GeoDataFrame is missing the 'area_y' column.
+
     Returns:
         GeoDataFrame: GeoDataFrame with added 'greendex' and 'weight' columns.
     """
-    gdf['greendex'] = gdf['area_y'] / gdf['area_x']
+    if 'area_x' not in gdf.columns:
+        raise ValueError("Road segment buffer area field (area_x) missing")
+
+    if 'area_y' not in gdf.columns:
+        raise ValueError("Tree buffer clip area field (area_y) missing")
+
+    gdf['greendex'] = (gdf['area_y'] / gdf['area_x'].replace(0, np.nan)).clip(upper=1)
     gdf['greendex'] = gdf['greendex'].fillna(0)
     gdf['greendex'] = gdf['greendex'].round(4)
 
-    length_norm = (gdf['length'] - gdf['length'].min()) / (gdf['length'].max() - gdf['length'].min())
+    if gdf['length'].max() == gdf['length'].min():
+        length_norm = 1.0
+    else:
+        length_norm = (gdf['length'] - gdf['length'].min()) / (gdf['length'].max() - gdf['length'].min())
+    
     green_norm = 1 - gdf['greendex']
     gdf['weight'] = length_norm * green_norm
     gdf['weight'] = gdf['weight'].round(4)
