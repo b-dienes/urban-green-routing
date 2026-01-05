@@ -90,16 +90,24 @@ class DownloadOsm:
         """
         ox.plot_graph(self.response_content, node_size=10, edge_color="green", edge_linewidth=1, figsize=(12, 12))
 
-    def osm_graph_downloader(self, visualize: bool = False) -> None:
+    def osm_graph_downloader(self, visualize: bool = False, overwrite: bool = False) -> None:
         """
         Run the full OSM download pipeline. Optionally visualize the graph.
 
         Args:
             visualize (bool): Show graph plot. Defaults to False.
         """
+        output_path = self.raw_folder / f"{self.user_input.aoi_name}_graph.graphml"        
+
+        if output_path.exists() and not overwrite:
+            logger.info("OSM graph already exists at %s, skipping download", output_path)
+            self.response_content = ox.load_graphml(output_path)
+            return
+
         self.osm_request()
         self.osm_save()
         self.osm_gpkg_save()
+        
         if visualize:
             self.osm_visualize()
 
@@ -109,4 +117,4 @@ if __name__ == "__main__":
     raw_folder = get_data_folder("raw")
 
     download_osm = DownloadOsm(user_input, bbox_osm, raw_folder)
-    download_osm.osm_graph_downloader(visualize=True)
+    download_osm.osm_graph_downloader(visualize=True, overwrite=False)

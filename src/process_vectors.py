@@ -137,19 +137,43 @@ class ProcessVectors:
         result.to_file(output_vector_path, driver="GPKG")
         logger.info("Greendex calculated: %s", output_vector_path)
 
-    def process_vectors(self) -> None:
+    def process_vectors(self, overwrite: bool = False) -> None:
         """
         Orchestrates the full vector workflow: tree extraction, buffering, clipping, and greendex calculation.
         """
-        self.extract_tree_polygons()
-        self.tree_buffer()
-        self.road_buffer()
-        self.clip_roads()
-        self.calculate_areas()
+        polygons_path = self.raw_folder / f"{self.user_input.aoi_name}_tree_mask_polygons_reproj.gpkg"
+        if polygons_path.exists() and not overwrite:
+            self.extract_tree_polygons()
+        else:
+            logger.info("Tree polygons already exist: skipping")
+
+        tree_buffer_path = self.raw_folder / f"{self.user_input.aoi_name}_tree_buffer_polygons_reproj.gpkg"
+        if tree_buffer_path.exists() and not overwrite:
+            self.tree_buffer()
+        else:
+            logger.info("Tree buffers already exist: skipping")                 
+
+        edges_buffer_path = self.raw_folder / f"{self.user_input.aoi_name}_edges_buffer_reproj.gpkg"
+        if edges_buffer_path.exists() and not overwrite:
+            self.road_buffer()
+        else:
+            logger.info("Road buffers already exist: skipping")                 
+
+        edges_clipped_path = self.raw_folder / f"{self.user_input.aoi_name}_edges_buffer_clipped.gpkg"
+        if edges_clipped_path.exists() and not overwrite:
+            self.clip_roads()
+        else:
+            logger.info("Clipped road buffers already exist: skipping")                 
+
+        areas_calculated_path = self.raw_folder / f"{self.user_input.aoi_name}_edges_greendex.gpkg"
+        if areas_calculated_path.exists() and not overwrite:
+            self.calculate_areas()
+        else:
+            logger.info("Area calculation already done: skipping")                 
 
 if __name__ == "__main__":
     user_input = user_input()
     raw_folder = get_data_folder("raw")
 
     process_vectors = ProcessVectors(user_input, raw_folder)
-    process_vectors.process_vectors()
+    process_vectors.process_vectors(overwrite=False)

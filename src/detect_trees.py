@@ -90,10 +90,16 @@ class DetectTrees:
 
         logger.info("Tree mask raster saved to %s", output_path)
 
-    def tree_detector(self) -> None:
+    def tree_detector(self, overwrite: bool = False) -> None:
         """
         Run the full detection pipeline: load model, predict mask, save output.
         """
+        output_path = self.raw_folder / f"{self.user_input.aoi_name}_tree_mask.tif"
+
+        if output_path.exists() and not overwrite:
+            logger.info("Tree mask already exists at %s, skipping detection", output_path)
+            return
+
         self.load_classifier()
         self.mask_predictor()
         self.mask_saver()
@@ -103,4 +109,4 @@ if __name__ == "__main__":
     raw_folder = get_data_folder("raw")
 
     detect_trees = DetectTrees(user_input, raw_folder)
-    detect_trees.tree_detector()
+    detect_trees.tree_detector(overwrite=False)

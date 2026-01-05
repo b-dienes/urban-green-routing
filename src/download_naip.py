@@ -93,11 +93,21 @@ class DownloadNaip:
 
         logger.info("NAIP image saved to %s", output_path)
         
-    def naip_downloader(self) -> None:
+    def naip_downloader(self, overwrite: bool = False) -> None:
         """
         Orchestrates the download and save process.
-        Calls naip_request() to get image data and naip_save() to write it to disk.
+        Checks if the NAIP image already exists before downloading.
+        If not, calls naip_request() to get image data and naip_save() to write it to disk.
+
+        Args:
+            overwrite (bool): If True, forces re-download even if file exists.
         """
+        output_path = self.raw_folder / f"{self.user_input.aoi_name}.tif"
+
+        if output_path.exists() and not overwrite:
+            logger.info("NAIP image already exists at %s, skipping download", output_path)
+            return
+
         self.naip_request()
         self.naip_save()
 
@@ -108,4 +118,4 @@ if __name__ == "__main__":
     raw_folder = get_data_folder("raw")
 
     download_naip = DownloadNaip(user_input, bbox_mercator, width, height, raw_folder)
-    download_naip.naip_downloader()
+    download_naip.naip_downloader(overwrite=False)

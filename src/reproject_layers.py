@@ -58,10 +58,20 @@ class ReprojectLayers:
 
             logger.info("Layer reprojected: %s -> %s", layer["input"].format(aoi=self.user_input.aoi_name), layer["output"].format(aoi=self.user_input.aoi_name))
 
-    def reproject_layers(self) -> None:
+    def reproject_layers(self, overwrite: bool = False) -> None:
         """
         Run the reproject pipeline.
         """
+        output_paths = [
+            self.raw_folder / f"{self.user_input.aoi_name}_reprojected.tif",
+            self.raw_folder / f"{self.user_input.aoi_name}_tree_mask_reprojected.tif",
+            self.raw_folder / f"{self.user_input.aoi_name}_edges_reprojected.gpkg"
+            ]
+
+        if all(path.exists() for path in output_paths) and not overwrite:
+            logger.info("All reprojected layers already exist, skipping reprojection")
+            return
+
         self.reproject_all_layers()
 
 if __name__ == "__main__":
@@ -70,4 +80,4 @@ if __name__ == "__main__":
     raw_folder = get_data_folder("raw")
 
     reprojector = ReprojectLayers(user_input, dst_crs, raw_folder)
-    reprojector.reproject_layers()
+    reprojector.reproject_layers(overwrite=False)
