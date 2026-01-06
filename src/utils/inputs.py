@@ -65,8 +65,8 @@ def user_input() -> UserInput:
     # USER INPUT:
     # SW and NE coordinates (lon, lat)
     # Resolution (min: 0.6 meter/pixel is the highest possible in NAIP)
-    aoi_name = "bend_oregon"
-    sw_lat, sw_lon = 44.05, -121.3285
+    aoi_name = "060126_bend_oregon"
+    sw_lat, sw_lon = 44.050315, -121.327975
     ne_lat, ne_lon = 44.06, -121.3145
     resolution = 0.6
 
