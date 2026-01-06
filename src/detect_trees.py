@@ -1,5 +1,7 @@
 import logging
 from pathlib import Path
+import torch
+torch.set_num_threads(1)  # workaround for WinError 127
 import detectree as dtr
 import rasterio
 import numpy as np
