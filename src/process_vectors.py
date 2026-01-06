@@ -57,6 +57,26 @@ class ProcessVectors:
         self.user_input: UserInput = user_input
         self.raw_folder: Path = raw_folder
 
+    def _process_step(self, path: Path, method: callable, step_name: str, overwrite: bool) -> None:
+        """
+        Helper method to avoid repeating file existence checks for workflow steps.
+
+        Args:
+            path (Path): Path to the output file of this step.
+            method (callable): The processing method to run if the file does not exist or overwrite=True.
+            step_name (str): Name of the step for logging purposes.
+            overwrite (bool): Whether to force rerun the step even if file exists.
+
+        Behavior:
+            - Logs that the step is skipped if file exists and overwrite is False.
+            - Otherwise, calls the provided method.
+        """
+        if path.exists() and not overwrite:
+            logger.info("%s already exists: skipping", step_name)                 
+        else:
+            method()
+
+
     @handle_errors
     def extract_tree_polygons(self) -> None:
         """
@@ -140,36 +160,23 @@ class ProcessVectors:
     def process_vectors(self, overwrite: bool = False) -> None:
         """
         Orchestrates the full vector workflow: tree extraction, buffering, clipping, and greendex calculation.
+
+        Uses _process_step helper to avoid repeated file existence checks and logging.
         """
         polygons_path = self.raw_folder / f"{self.user_input.aoi_name}_tree_mask_polygons_reproj.gpkg"
-        if polygons_path.exists() and not overwrite:
-            self.extract_tree_polygons()
-        else:
-            logger.info("Tree polygons already exist: skipping")
-
+        self._process_step(polygons_path, self.extract_tree_polygons, "Tree polygons", overwrite)
+        
         tree_buffer_path = self.raw_folder / f"{self.user_input.aoi_name}_tree_buffer_polygons_reproj.gpkg"
-        if tree_buffer_path.exists() and not overwrite:
-            self.tree_buffer()
-        else:
-            logger.info("Tree buffers already exist: skipping")                 
+        self._process_step(tree_buffer_path, self.tree_buffer, "Tree buffers", overwrite)
 
         edges_buffer_path = self.raw_folder / f"{self.user_input.aoi_name}_edges_buffer_reproj.gpkg"
-        if edges_buffer_path.exists() and not overwrite:
-            self.road_buffer()
-        else:
-            logger.info("Road buffers already exist: skipping")                 
+        self._process_step(edges_buffer_path, self.road_buffer, "Road buffers", overwrite)
 
         edges_clipped_path = self.raw_folder / f"{self.user_input.aoi_name}_edges_buffer_clipped.gpkg"
-        if edges_clipped_path.exists() and not overwrite:
-            self.clip_roads()
-        else:
-            logger.info("Clipped road buffers already exist: skipping")                 
-
+        self._process_step(edges_clipped_path, self.clip_roads, "Clipped road buffers", overwrite)
+        
         areas_calculated_path = self.raw_folder / f"{self.user_input.aoi_name}_edges_greendex.gpkg"
-        if areas_calculated_path.exists() and not overwrite:
-            self.calculate_areas()
-        else:
-            logger.info("Area calculation already done: skipping")                 
+        self._process_step(areas_calculated_path, self.calculate_areas, "Area calculation", overwrite)
 
 if __name__ == "__main__":
     user_input = user_input()
